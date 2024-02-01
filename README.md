@@ -1,13 +1,10 @@
-# Sample Hardhat Project
+# Loyalty Contracts
 
-This project demonstrates a basic Hardhat use case. It comes with a sample contract, a test for that contract, and a script that deploys that contract.
+This is a new repo for on-chain loyalty program smart contracts and optional escrow contracts.
 
-Try running some of the following tasks:
+The first version of the contracts were done in a separate repo using Truffle to test, etc.
+For the second version of the contracts, I've decided to continue the work using Hardhat instead of Truffle.
 
-```shell
-npx hardhat help
-npx hardhat test
-REPORT_GAS=true npx hardhat test
-npx hardhat node
-npx hardhat run scripts/deploy.ts
+```
+
 ```
