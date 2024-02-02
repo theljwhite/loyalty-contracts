@@ -1,5 +1,6 @@
 import { HardhatUserConfig } from "hardhat/config";
 import "@nomicfoundation/hardhat-toolbox-viem";
+import "@nomiclabs/hardhat-ethers";
 
 const config: HardhatUserConfig = {
   solidity: {

@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.19;
 
-import "./LoyaltyProgram.sol";
+import "./LoyaltyProgram.sol"; 
 import "./extensions/LoyaltyEscrowRegistry.sol";
 import "./utils/LoyaltySorting.sol";
 
@@ -13,7 +13,9 @@ contract Loyalty is LoyaltyEscrowRegistry {
     uint256[] memory _rewards,
     RewardType _rewardType,
     uint256 _programEndsAt,
-    bool _tiersSortingActive
+    bool _tiersSortingActive,
+    bytes32[] memory _tierNames,
+    uint256[] memory _tierRewardsRequired
   )
     LoyaltyProgram(
       _name,
@@ -21,7 +23,10 @@ contract Loyalty is LoyaltyEscrowRegistry {
       _authorities,
       _rewards,
       _rewardType,
-      _programEndsAt
+      _programEndsAt,
+      _tiersSortingActive,
+      _tierNames, 
+      _tierRewardsRequired
     )
     LoyaltySorting(_tiersSortingActive)
   {}

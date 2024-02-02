@@ -123,7 +123,10 @@ abstract contract LoyaltyProgram is LoyaltySorting {
     bytes32[] memory _authorities,
     uint256[] memory _rewards,
     RewardType _rewardType,
-    uint256 _programEndsAt
+    uint256 _programEndsAt,
+    bool _tiersSortingActive,
+    bytes32[] memory _tierNames,
+    uint256[] memory _tierRewardsRequired
   ) {
     if (bytes(_name).length == 0) revert EmptyProgramName();
     if (_targetObjectives.length == 0) revert EmptyObjectives();
@@ -156,11 +159,16 @@ abstract contract LoyaltyProgram is LoyaltySorting {
       );
       totalPointsPossible += _rewards[i];
     }
+
+  if (_tiersSortingActive && _tierNames.length > 0 && _tierRewardsRequired.length > 0){
+    addTiers(_tierNames, _tierRewardsRequired);
+  }
+
     emit LoyaltyProgramCreated(_name, msg.sender, _rewardType);
   }
 
   function version() public pure returns (string memory) {
-    return "0.01";
+    return "0.02";
   }
 
   function state() public view returns (LoyaltyState) {
@@ -184,12 +192,9 @@ abstract contract LoyaltyProgram is LoyaltySorting {
   }
 
   function addTiers(
-    bytes32[] calldata _tierNames,
-    uint256[] calldata _tierRewardsRequired
-  ) external {
-    if (msg.sender != creator) revert OnlyCreatorCanCall();
-    if (state() != LoyaltyState.Idle) revert CannotAddTiersOnceProgramStarted();
-
+    bytes32[] memory _tierNames,
+    uint256[] memory _tierRewardsRequired
+  ) internal {
     if (_tierNames.length != _tierRewardsRequired.length)
       revert TierNamesAndRewardArraysMustBeSameLength();
 
@@ -357,6 +362,7 @@ abstract contract LoyaltyProgram is LoyaltySorting {
   function getObjectives() external view returns (Objective[] memory) {
     return objectives;
   }
+
 
   function getUserProgression(address _user)
     external
