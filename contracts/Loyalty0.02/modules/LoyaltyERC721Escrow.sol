@@ -161,6 +161,10 @@ contract LoyaltyERC721Escrow is IERC721Receiver, Ownable {
         loyaltyProgramEndsAt = _programEndsAt;
     }
 
+    function version() public pure returns (string memory) {
+        return "0.02";
+    }
+
     function escrowState() public view returns (EscrowState) {
         if (
             canceled ||

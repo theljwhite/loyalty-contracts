@@ -124,11 +124,9 @@ contract LoyaltyERC1155Escrow is ERC1155Holder, Ownable {
     uint256 depositStartDate;
     uint256 depositEndDate;
     bool public isAwaitingEscrowApprovals;
-    bool public isAwaitingEscrowSettings;
-    bool public isAwaitingDeposit;
+
     bool public areEscrowSettingsSet;
     bool public inIssuance;
-    bool public completed;
     bool public allFundsLocked;
     bool public canceled;
 
@@ -184,7 +182,7 @@ contract LoyaltyERC1155Escrow is ERC1155Holder, Ownable {
     }
 
     function version() public pure returns (string memory) {
-        return "0.01";
+        return "0.02";
     }
 
     function escrowState() public view returns (EscrowState) {

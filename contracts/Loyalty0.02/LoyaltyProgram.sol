@@ -81,16 +81,12 @@ abstract contract LoyaltyProgram is LoyaltySorting {
     uint256 public erc20Budget;
     uint256 public programEndsAt;
     RewardType public rewardType;
-
     bool public canceled;
 
     Objective[] objectives;
     mapping(uint256 => Tier) tiers;
     mapping(address => User) users;
 
-    address public erc20Escrow;
-    address public erc721Escrow;
-    address public erc1155Escrow;
     ILoyaltyERC1155Escrow erc1155EscrowContract;
     ILoyaltyERC721Escrow erc721EscrowContract;
     ILoyaltyERC20Escrow erc20EscrowContract;
