@@ -2,7 +2,7 @@ import { time } from "@nomicfoundation/hardhat-toolbox-viem/network-helpers";
 import { expect } from "chai";
 import hre from "hardhat";
 const { expectEvent, expectRevert } = require("@openzeppelin/test-helpers");
-import { type SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers";
+import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers";
 import {
   VERSION_0_02_ERC20_ESCROW,
   VERSION_0_02_LOYALTY_FACTORY,
@@ -13,11 +13,14 @@ import {
   LoyaltyState,
   EscrowState,
 } from "../../constants/contractEnums";
+import { THREE_DAYS_MS, TWO_DAYS_MS } from "../../constants/timeAndDate";
 
 let currentTimeInSeconds: number = 0;
 let accounts: SignerWithAddress[] = [];
 let creatorOne: SignerWithAddress;
 let creatorTwo: SignerWithAddress;
+let depositorOne: SignerWithAddress;
+let depositorTwo: SignerWithAddress;
 
 let loyaltyProgramOne: any;
 let loyaltyProgramOneAddress: string = "";
@@ -26,18 +29,29 @@ let loyaltyProgramOneEndsAt: number = 0;
 let erc20EscrowOne: any;
 let erc20EscrowOneAddress: string = "";
 
+let testToken: any;
+
 describe("LoyaltyProgram", () => {
-  //in first contract version, tiers required an additional external call to be added.
-  //this will ensure that with tier info added directly to contract constructor,
-  //that the tiers are added directly with contract deploy
   before(async () => {
     currentTimeInSeconds = await time.latest();
     accounts = await hre.ethers.getSigners();
     creatorOne = accounts[1];
     creatorTwo = accounts[2];
+    depositorOne = accounts[3];
+    depositorTwo = accounts[4];
+
+    //deploy ERC20 test token to be used as rewards for escrow contract
+    testToken = await hre.ethers.deployContract("AdajToken");
+
+    //transfer test ERC20 tokens to creator to be used for rewards depositing
+
+    await testToken.transfer(creatorOne.address, 1_000_000);
   });
 
   it("ensures that a loyalty program contract can be deployed with tier handling moved directly to its constructor", async () => {
+    //in first contract version, tiers required an additional external call to be added.
+    //this will ensure that with tier info added directly to contract constructor,
+    //that the tiers are added directly with contract deploy
     const loyaltyContractFactory = await hre.ethers.getContractFactory(
       VERSION_0_02_LOYALTY_FACTORY
     );
@@ -143,13 +157,21 @@ describe("LoyaltyProgram", () => {
     const erc20EscrowFactory = await hre.ethers.getContractFactory(
       VERSION_0_02_ERC20_ESCROW
     );
+    const rewardTokenAddress = testToken.address;
+    const approvedDepositors: string[] = [
+      creatorOne.address,
+      depositorOne.address,
+      depositorTwo.address,
+    ];
 
     const erc20EscrowContract = await erc20EscrowFactory
       .connect(creatorOne)
       .deploy(
         loyaltyProgramOneAddress,
         creatorOne.address,
-        loyaltyProgramOneEndsAt
+        loyaltyProgramOneEndsAt,
+        rewardTokenAddress,
+        approvedDepositors
       );
     erc20EscrowOne = await hre.ethers.getContractAt(
       VERSION_0_02_ERC20_ESCROW,
@@ -176,7 +198,7 @@ describe("LoyaltyProgram", () => {
     //ensure escrow state is correct
     const escrowState = await erc20EscrowOne.escrowState();
     expect(escrowState).equal(
-      EscrowState.AwaitingEscrowApprovals,
+      EscrowState.Idle,
       "Incorrect initial escrow state"
     );
 
@@ -244,5 +266,73 @@ describe("LoyaltyProgram", () => {
     expect(totalPointsPossible.toNumber()).equal(7800, "Incorrect points");
     expect(rewardType).equal(RewardType.ERC20, "Incorrect reward type");
     expect(objectives).length(5, "The five objectives should have been added");
+  });
+  it("ensures escrow state during deposit flow still works correctly after steps were moved to constructor", async () => {
+    //in version 0.01 contracts, approveSender and approveToken/approveRewards...
+    //...were done with external calls. In 0.02, I have changed it so that this step
+    //...can be done directly in the escrow contracts' constructors at deploy time
+
+    //ensure initial state is Idle initially after deployment
+    const initialState = await erc20EscrowOne.escrowState();
+    expect(initialState).equal(EscrowState.Idle);
+
+    //verify that after constructor changes, that token and depositors (senders) are approved
+    const isTokenApproved = await erc20EscrowOne.isTokenApproved(
+      testToken.address
+    );
+    const isSenderApproved1 = await erc20EscrowOne.isSenderApproved(
+      creatorOne.address
+    );
+    const isSenderApproved2 = await erc20EscrowOne.isSenderApproved(
+      depositorOne.address
+    );
+    const isSenderApproved3 = await erc20EscrowOne.isSenderApproved(
+      depositorTwo.address
+    );
+
+    expect(isTokenApproved).equal(true, "Incorrect");
+    expect(isSenderApproved1).equal(true, "Incorrect");
+    expect(isSenderApproved2).equal(true, "Incorrect");
+    expect(isSenderApproved3).equal(true, "Incorrect");
+
+    //ensure deposit key can be set and that escrow state updates accordingly.
+    //deposit period starts when deposit key is set, so escrow state should update
+    const sampleDepositKey = "clscttni60000356tqrpthp7b";
+    const depositKeyBytes32 =
+      hre.ethers.utils.formatBytes32String(sampleDepositKey);
+    const datePlusTwoDays = new Date().getTime() + TWO_DAYS_MS;
+    const depositEndDate = Math.round(datePlusTwoDays / 1000);
+
+    //call set deposit key as creator one
+    await erc20EscrowOne
+      .connect(creatorOne)
+      .setDepositKey(depositKeyBytes32, depositEndDate);
+
+    //verify that after key is set, state has changed to DepositPeriod
+    const stateAfterDepositKeySet = await erc20EscrowOne.escrowState();
+    expect(stateAfterDepositKeySet).equal(
+      EscrowState.DepositPeriod,
+      "Incorrect state"
+    );
+
+    //deposit 1000 test ERC20 tokens for further testing
+    await testToken
+      .connect(creatorOne)
+      .increaseAllowance(erc20EscrowOneAddress, 10000);
+
+    await erc20EscrowOne
+      .connect(creatorOne)
+      .depositBudget(1000, testToken.address);
+
+    //now that tokens have been deposited:
+    //move time forward 3+ days so that the deposit period has finished
+
+    //TODO - unfinished
+
+    //customize escrow settings by caling setEscrowSettings
+    //for this test, use Reward Per Objective rewardCondition
+    //after escrow settings are set, escrow state should still be
+
+    //TODO - unfinished
   });
 });

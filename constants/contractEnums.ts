@@ -15,7 +15,6 @@ export enum LoyaltyState {
 
 export enum EscrowState {
   Idle,
-  AwaitingEscrowApprovals,
   DepositPeriod,
   AwaitingEscrowSettings,
   InIssuance,
