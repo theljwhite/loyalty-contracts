@@ -22,3 +22,30 @@ export enum EscrowState {
   Frozen,
   Canceled,
 }
+
+export enum ERC20RewardCondition {
+  NotSet,
+  AllObjectivesComplete,
+  SingleObjective,
+  AllTiersComplete,
+  SingleTier,
+  PointsTotal,
+  RewardPerObjective,
+  RewardPerTier,
+}
+
+export enum ERC721RewardCondition {
+  NotSet,
+  ObjectiveCompleted,
+  TierReached,
+  PointsTotal,
+}
+
+export enum ERC1155RewardCondition {
+  NotSet,
+  EachObjective,
+  SingleObjective,
+  EachTier,
+  SingleTier,
+  PointsTotal,
+}

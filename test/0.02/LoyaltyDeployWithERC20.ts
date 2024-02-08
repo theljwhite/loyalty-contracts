@@ -1,8 +1,7 @@
 import { time } from "@nomicfoundation/hardhat-toolbox-viem/network-helpers";
 import { expect } from "chai";
 import hre from "hardhat";
-const { expectEvent, expectRevert } = require("@openzeppelin/test-helpers");
-import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers";
+import { type SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers";
 import {
   VERSION_0_02_ERC20_ESCROW,
   VERSION_0_02_LOYALTY_FACTORY,
@@ -12,8 +11,15 @@ import {
   RewardType,
   LoyaltyState,
   EscrowState,
+  ERC20RewardCondition,
 } from "../../constants/contractEnums";
-import { THREE_DAYS_MS, TWO_DAYS_MS } from "../../constants/timeAndDate";
+import {
+  ONE_MONTH_SECONDS,
+  THREE_DAYS_MS,
+  TWO_DAYS_MS,
+} from "../../constants/timeAndDate";
+
+// const { expectEvent, expectRevert } = require("@openzeppelin/test-helpers");
 
 let currentTimeInSeconds: number = 0;
 let accounts: SignerWithAddress[] = [];
@@ -44,7 +50,6 @@ describe("LoyaltyProgram", () => {
     testToken = await hre.ethers.deployContract("AdajToken");
 
     //transfer test ERC20 tokens to creator to be used for rewards depositing
-
     await testToken.transfer(creatorOne.address, 1_000_000);
   });
 
@@ -78,8 +83,8 @@ describe("LoyaltyProgram", () => {
     );
     const tierRewardsRequired = [400, 4400, 7000, 7800];
 
-    const oneMonthInSeconds = 30 * 24 * 60 * 60;
-    const programEndsAtDate = currentTimeInSeconds + oneMonthInSeconds;
+    const threeMonthsFromNow = ONE_MONTH_SECONDS * 3;
+    const programEndsAtDate = threeMonthsFromNow + currentTimeInSeconds;
     const tierSortingActive = true;
 
     //deploy loyalty program as creator one address
@@ -326,13 +331,72 @@ describe("LoyaltyProgram", () => {
 
     //now that tokens have been deposited:
     //move time forward 3+ days so that the deposit period has finished
+    const blockNumBefore = await hre.ethers.provider.getBlockNumber();
+    const datePlusThreeDays = new Date().getTime() + THREE_DAYS_MS;
+    const movedTime = Math.round(datePlusThreeDays / 1000);
 
-    //TODO - unfinished
+    await hre.ethers.provider.send("evm_mine", [movedTime]);
 
-    //customize escrow settings by caling setEscrowSettings
-    //for this test, use Reward Per Objective rewardCondition
-    //after escrow settings are set, escrow state should still be
+    const blockNumAfter = await hre.ethers.provider.getBlockNumber();
+    const blockAfter = await hre.ethers.provider.getBlock(blockNumAfter);
 
-    //TODO - unfinished
+    expect(blockNumAfter).to.be.greaterThan(blockNumBefore);
+    expect(blockAfter.timestamp).to.be.equal(movedTime);
+
+    //ensure that now that time is changed and deposit period is over,
+    //escrow state should have changed to AwaitingEscrowSettings
+    const stateAfterDepositEnd = await erc20EscrowOne.escrowState();
+    expect(stateAfterDepositEnd).equal(
+      EscrowState.AwaitingEscrowSettings,
+      "Incorrect state"
+    );
+
+    //customize escrow settings by calling setEscrowSettings.
+    //for this test, use Reward Per Objective rewardCondition.
+    //after escrow settings are set:
+    //loyalty state should be Idle
+    //escrow state should be Idle
+    const payouts = [1, 2, 3, 4, 5]; //token amounts to payout for each objective index complete
+    await erc20EscrowOne
+      .connect(creatorOne)
+      .setEscrowSettingsAdvanced(
+        ERC20RewardCondition.RewardPerObjective,
+        payouts
+      );
+
+    const escrowStateAfterEscrowSettingsSet =
+      await erc20EscrowOne.escrowState();
+    const loyaltyState = await loyaltyProgramOne.state();
+
+    expect(loyaltyState).equal(LoyaltyState.Idle);
+    expect(escrowStateAfterEscrowSettingsSet).equal(EscrowState.Idle);
+
+    //next, set loyalty program as active.
+    //this will "start" the loyalty program, changing its state to Active.
+    //escrow state should now change to InIssuance
+    await loyaltyProgramOne.connect(creatorOne).setLoyaltyProgramActive();
+
+    const loyaltyStateAfterActive = await loyaltyProgramOne.state();
+    const escrowStateAfterActive = await erc20EscrowOne.escrowState();
+
+    expect(loyaltyStateAfterActive).equal(LoyaltyState.Active);
+    expect(escrowStateAfterActive).equal(EscrowState.InIssuance);
+
+    //call possibly temporary "getAmountByPayoutIndex" function to ensure escrow settings
+    //are correct.
+    //there were 5 objectives, so each objective should have correct payout amount.
+    const payoutIndexToAmount: { index: number; amount: number }[] = [];
+    for (let i = 0; i < payouts.length; i++) {
+      const amount = await erc20EscrowOne.getAmountByPayoutIndex(i);
+      payoutIndexToAmount.push({ index: i, amount: amount.toNumber() });
+    }
+    const correctPayoutShape = [
+      { index: 0, amount: 1 },
+      { index: 1, amount: 2 },
+      { index: 2, amount: 3 },
+      { index: 3, amount: 4 },
+      { index: 4, amount: 5 },
+    ];
+    expect(payoutIndexToAmount).deep.equal(correctPayoutShape);
   });
 });
