@@ -32,7 +32,7 @@ import { simulateOffChainSortTokens } from "../../utils/sortTokens";
 let currentTimeInSeconds: number = 0;
 let accounts: SignerWithAddress[] = [];
 let creatorOne: SignerWithAddress;
-let creatorTwo: SignerWithAddress;
+
 let depositorOne: SignerWithAddress;
 let depositorTwo: SignerWithAddress;
 
@@ -50,7 +50,6 @@ describe("LoyaltyProgram", () => {
     currentTimeInSeconds = await time.latest();
     accounts = await hre.ethers.getSigners();
     creatorOne = accounts[1];
-    creatorTwo = accounts[2];
     depositorOne = accounts[3];
     depositorTwo = accounts[4];
 

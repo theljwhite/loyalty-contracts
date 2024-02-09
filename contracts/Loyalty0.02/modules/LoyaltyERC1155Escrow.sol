@@ -9,7 +9,6 @@ import "@openzeppelin/contracts/access/Ownable.sol";
 contract LoyaltyERC1155Escrow is ERC1155Holder, Ownable {
     enum EscrowState {
         Idle,
-        AwaitingEscrowApprovals,
         DepositPeriod,
         AwaitingEscrowSettings,
         InIssuance,
@@ -75,16 +74,6 @@ contract LoyaltyERC1155Escrow is ERC1155Holder, Ownable {
         RewardCondition rewardCondition,
         uint256 updatedAt
     );
-    event ERC1155SenderApproved(
-        address sender,
-        address approvedBy,
-        uint256 approvedAt
-    );
-    event ERC1155CollectionApproved(
-        address collection,
-        address approvedBy,
-        uint256 approvedAt
-    );
     event ERC1155Rewarded(
         address user,
         uint256 token,
@@ -115,18 +104,19 @@ contract LoyaltyERC1155Escrow is ERC1155Holder, Ownable {
     address public loyaltyProgramAddress;
     address public constant TEAM_ADDRESS =
         0x262dE7a263d23BeA5544b7a0BF08F2c00BFABE7b;
+    uint256 public constant MAX_DEPOSITORS = 3; 
+
     address public creator;
     uint256 public constant PAYOUT_BUFFER = 4;
     uint256 public maxTokenIdsAllowed = 5;
 
-    uint256 private escrowApprovalsCount;
     uint256 loyaltyProgramEndsAt;
     uint256 depositStartDate;
     uint256 depositEndDate;
-    bool public isAwaitingEscrowApprovals;
 
     bool public areEscrowSettingsSet;
     bool public inIssuance;
+    bool public isDepositKeySet; 
     bool public allFundsLocked;
     bool public canceled;
 
@@ -143,6 +133,7 @@ contract LoyaltyERC1155Escrow is ERC1155Holder, Ownable {
     error OnlyCreatorCanCall();
 
     error ExceededMaxTokenIdsAmount();
+    error ExceededMaxDepositors(); 
     error OnlyLoyaltyProgramCanCall();
 
     error LoyaltyProgramMustBeIdle();
@@ -172,13 +163,23 @@ contract LoyaltyERC1155Escrow is ERC1155Holder, Ownable {
     constructor(
         address _loyaltyProgramAddress,
         address _creator,
-        uint256 _programEndsAt
+        uint256 _programEndsAt, 
+        address _rewardTokenAddress, 
+        address[] memory _approvedDepositors
     ) {
         creator = _creator;
         loyaltyProgram = LoyaltyProgram(_loyaltyProgramAddress);
         loyaltyProgramAddress = _loyaltyProgramAddress;
-        isAwaitingEscrowApprovals = true;
         loyaltyProgramEndsAt = _programEndsAt;
+
+        if (_approvedDepositors.length > MAX_DEPOSITORS){
+            revert ExceededMaxDepositors(); 
+        }
+
+        for (uint256 i = 0; i < _approvedDepositors.length; i++){
+            isApprovedSender[_approvedDepositors[i]] = true; 
+        }
+        isCollectionLoyaltyProgramApproved[_rewardTokenAddress] = true; 
     }
 
     function version() public pure returns (string memory) {
@@ -194,20 +195,15 @@ contract LoyaltyERC1155Escrow is ERC1155Holder, Ownable {
         }
         if (allFundsLocked) return EscrowState.Frozen;
 
-        if (isAwaitingEscrowApprovals && escrowApprovalsCount < 3)
-            return EscrowState.AwaitingEscrowApprovals;
-
         if (
-            escrowApprovalsCount == 3 &&
             depositStartDate <= block.timestamp &&
-            depositEndDate >= block.timestamp
+            depositEndDate >= block.timestamp && isDepositKeySet
         ) {
             return EscrowState.DepositPeriod;
         }
         if (
-            escrowApprovalsCount == 3 &&
             block.timestamp > depositEndDate &&
-            !areEscrowSettingsSet
+            !areEscrowSettingsSet && isDepositKeySet
         ) {
             return EscrowState.AwaitingEscrowSettings;
         }
@@ -870,38 +866,6 @@ contract LoyaltyERC1155Escrow is ERC1155Holder, Ownable {
         return userAccount[_user].rewardedTokenBalances;
     }
 
-    function approveCollection(
-        address _collectionAddress,
-        bool _isApproved
-    ) external {
-        if (msg.sender != creator) revert OnlyCreatorCanCall();
-        isCollectionLoyaltyProgramApproved[_collectionAddress] = _isApproved;
-
-        if (_isApproved) escrowApprovalsCount++;
-
-        if (escrowApprovalsCount == 3) {
-            isAwaitingEscrowApprovals = false;
-        }
-
-        emit ERC1155CollectionApproved(
-            _collectionAddress,
-            msg.sender,
-            block.timestamp
-        );
-    }
-
-    function approveSender(address _sender, bool _isApproved) external {
-        if (msg.sender != creator) revert OnlyCreatorCanCall();
-        isApprovedSender[_sender] = _isApproved;
-        escrowApprovalsCount++;
-
-        if (escrowApprovalsCount == 3) {
-            isAwaitingEscrowApprovals = false;
-        }
-
-        emit ERC1155SenderApproved(_sender, msg.sender, block.timestamp);
-    }
-
     function setDepositKey(bytes32 key, uint256 _depositEndDate) external {
         if (msg.sender != creator) revert OnlyCreatorCanCall();
 
@@ -916,15 +880,10 @@ contract LoyaltyERC1155Escrow is ERC1155Holder, Ownable {
         ) {
             revert DepositEndDateExceedsProgramEnd();
         }
-
         validDepositKeys[key] = true;
-        escrowApprovalsCount++;
         depositStartDate = block.timestamp;
         depositEndDate = _depositEndDate;
-
-        if (escrowApprovalsCount == 3) {
-            isAwaitingEscrowApprovals = false;
-        }
+        isDepositKeySet = true; 
     }
 
     function emergencyFreeze(bool _isFrozen) external {
