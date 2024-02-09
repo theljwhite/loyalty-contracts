@@ -136,6 +136,7 @@ contract LoyaltyERC721Escrow is IERC721Receiver, Ownable {
     error NoTokensToWithdraw();
     error LoyaltyProgramMustBeCompleted();
     error ExceededMaxDepositors(); 
+    error IncorrectDepositKey(); 
 
     constructor(
         address _loyaltyProgramAddress,
@@ -410,10 +411,10 @@ contract LoyaltyERC721Escrow is IERC721Receiver, Ownable {
         emit SortTokenQueue(_sender, tokenIds, _rewardOrder, block.timestamp);
     }
 
-    function receiveTokenQueue(uint256[] memory _sortedTokenQueue) external {
-        if (msg.sender != TEAM_ADDRESS) revert OnlyTeamCanCall();
-        if (_sortedTokenQueue.length != tokenIds.length)
-            revert TokenQueueLengthMismatch();
+    function receiveTokenQueue(uint256[] memory _sortedTokenQueue, bytes32 _depositKey) external {
+        if (msg.sender != TEAM_ADDRESS && msg.sender != creator) revert OnlyTeamOrCreatorCanCall();
+        if (_sortedTokenQueue.length != tokenIds.length) revert TokenQueueLengthMismatch();
+        if (!validDepositKeys[_depositKey]) revert IncorrectDepositKey(); 
 
         tokenQueue = _sortedTokenQueue;
         inIssuance = true;

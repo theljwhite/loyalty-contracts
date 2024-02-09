@@ -328,6 +328,57 @@ describe("LoyaltyProgram", () => {
       returnedTokenIdsToNum,
       rewardOrder
     );
-    //TODO 2/9 - unifinished test
+    const correctSortedShape = Array.from({ length: 50 }, (_, i) => i).sort(
+      (a, b) => b - a
+    );
+    expect(sortedTokenIdsForAscending).deep.equal(correctSortedShape);
+
+    //now that the token queue is sorted for Ascending reward order, return the order to the contract.
+    //ensure that tokenQueue state variable is updated correctly as well.
+    const receiveTokenQueue = await erc721EscrowOne
+      .connect(creatorOne)
+      .receiveTokenQueue(sortedTokenIdsForAscending, depositKeyBytes32);
+    const receiveTokenQueueReceipt = await receiveTokenQueue.wait();
+    const [tokenQueueReceivedEvent] =
+      await receiveTokenQueueReceipt.events.filter(
+        (e: any) => e.event === "TokenQueueReceived"
+      );
+    const { sortedTokenQueue } = tokenQueueReceivedEvent.args;
+    const formattedTokenQueueReturn = sortedTokenQueue.map((tkn: any) =>
+      tkn.toNumber()
+    );
+    const sortedTokenQueueStateVar = await erc721EscrowOne
+      .connect(creatorOne)
+      .lookupTokenQueue();
+    const tokenQueueStateVarFormatted = sortedTokenQueueStateVar.map(
+      (tkn: any) => tkn.toNumber()
+    );
+
+    expect(formattedTokenQueueReturn).deep.equal(
+      correctSortedShape,
+      "Incorrect token queue event arg"
+    );
+    expect(tokenQueueStateVarFormatted).deep.equal(
+      correctSortedShape,
+      "Incorrect token queue state variable"
+    );
+
+    //state should still be Idle until loyalty program is set to active.
+    //afterwards, it should immediately change to InIssuance
+    const escrowStateAfterEscrowSettings = await erc721EscrowOne.escrowState();
+    expect(escrowStateAfterEscrowSettings).equal(EscrowState.Idle, "Incorrect");
+
+    await loyaltyProgramOne.connect(creatorOne).setLoyaltyProgramActive();
+    const escrowStateAfterProgramActive = await erc721EscrowOne.escrowState();
+    const loyaltyProgramStateAfterActive = await loyaltyProgramOne.state();
+
+    expect(escrowStateAfterProgramActive).equal(
+      EscrowState.InIssuance,
+      "Incorrect. LP is active and token queue is sorted with escrow settings set. Should be in issuance."
+    );
+    expect(loyaltyProgramStateAfterActive).equal(
+      LoyaltyState.Active,
+      "Incorrect"
+    );
   });
 });
