@@ -49,3 +49,10 @@ export enum ERC1155RewardCondition {
   SingleTier,
   PointsTotal,
 }
+
+export enum ERC721RewardOrder {
+  NotSet,
+  Ascending,
+  Descending,
+  Random,
+}

@@ -12,6 +12,7 @@ import {
   LoyaltyState,
   EscrowState,
   ERC721RewardCondition,
+  ERC721RewardOrder,
 } from "../../constants/contractEnums";
 import {
   ONE_MONTH_SECONDS,
@@ -26,6 +27,7 @@ import {
   tierNamesBytes32,
   tierRewardsRequired,
 } from "../../constants/basicLoyaltyConstructorArgs";
+import { simulateOffChainSortTokens } from "../../utils/sortTokens";
 
 let currentTimeInSeconds: number = 0;
 let accounts: SignerWithAddress[] = [];
@@ -201,7 +203,7 @@ describe("LoyaltyProgram", () => {
     );
     expect(isSenderApproved1).equal(
       true,
-      "Incorrect - deposit oen should be approved"
+      "Incorrect - depositor 1 should be approved"
     );
     expect(isSenderApproved2).equal(
       true,
@@ -212,7 +214,120 @@ describe("LoyaltyProgram", () => {
       "Incorrect - reward collection should be approved"
     );
   });
-  it("ensures escrow state during deposit flow still works correctly after steps were moved to constructor", async () => {
-    //TODO
+  it("ensures that escrow state during deposit flow still works correctly after some steps were moved to constructor", async () => {
+    //ensure deposit key can be set and that escrow state updates accordingly.
+    //deposit period starts when deposit key is set, so escrow state should update
+    const sampleDepositKey = "clscttni60000356tqrpthp7b";
+    const depositKeyBytes32 =
+      hre.ethers.utils.formatBytes32String(sampleDepositKey);
+    const datePlusTwoDays = new Date().getTime() + TWO_DAYS_MS;
+    const depositEndDate = Math.round(datePlusTwoDays / 1000);
+
+    await erc721EscrowOne
+      .connect(creatorOne)
+      .setDepositKey(depositKeyBytes32, depositEndDate);
+
+    const stateAfterDepositKeySet = await erc721EscrowOne.escrowState();
+    expect(stateAfterDepositKeySet).equal(EscrowState.DepositPeriod);
+
+    //now that deposit period is active, deposit 50 ERC721 tokens to be used as rewards
+    //transfer with deposit key as bytes _data argument.
+    //transfer the first 50 minted tokens (token ids 0 through 50);
+    for (let i = 0; i < 50; i++) {
+      await testCollection
+        .connect(creatorOne)
+        [
+          "safeTransferFrom(address,address,uint256,bytes)"
+        ](creatorOne.address, erc721EscrowOneAddress, i, depositKeyBytes32);
+    }
+
+    //ensure that state vars were updated after deposit
+    const { totalTokens, name, symbol, collection } =
+      await erc721EscrowOne.getBasicEscrowInfo();
+
+    const tokenIdsState = await erc721EscrowOne
+      .connect(creatorOne)
+      .getEscrowTokenIds();
+    const tokenIdsToNumber = tokenIdsState.map((tkn: any) => tkn.toNumber());
+    const correctTokenIdShape = Array.from({ length: 50 }, (_, i) => i);
+
+    expect(totalTokens.toNumber()).equal(
+      50,
+      "Incorrect token amount after deposit"
+    );
+    expect(name).equal("TestCollection", "Incorrect collection name");
+    expect(symbol).equal("TEST", "Incorrect symbol");
+    expect(collection).equal(
+      testCollection.address,
+      "Incorrect collection address"
+    );
+    expect(tokenIdsToNumber).deep.equal(
+      correctTokenIdShape,
+      "Incorrect token ids array"
+    );
+
+    //move time forward 3+ days so that the deposit period is ended.
+    //ensure that escrow state is correct. State should not change to InIssuance...
+    //...until the token ids are sorted (off-chain).
+    //After deposit period is over and before sort, state should move to Idle.
+    //Sorting is done when setEscrowSettings is called to customize escrow.
+    //The creator chooses the reward order and sorting is done based on it.
+    const blockNumBefore = await hre.ethers.provider.getBlockNumber();
+    const datePlusThreeDays = new Date().getTime() + THREE_DAYS_MS;
+    const movedTime = Math.round(datePlusThreeDays / 1000);
+
+    await hre.ethers.provider.send("evm_mine", [movedTime]);
+
+    const blockNumAfter = await hre.ethers.provider.getBlockNumber();
+    const blockAfter = await hre.ethers.provider.getBlock(blockNumAfter);
+    expect(blockNumAfter).to.be.greaterThan(blockNumBefore);
+    expect(blockAfter.timestamp).to.be.equal(movedTime);
+
+    const stateAfterDepositEnd = await erc721EscrowOne.escrowState();
+    expect(stateAfterDepositEnd).equal(EscrowState.AwaitingEscrowSettings);
+
+    //call escrow settings to customize escrow.
+    //for this test, Ascending rewardOrder will be used. (first user who completes an objective is rewarded lowest token id);
+    //after escrow settings are set, the sort tokens event is emitted and sorted off-chain.
+    //once the token queue is returned to the contract, its state should change to InIssuance
+
+    const rewardGoal = 4; //index of the objective that will reward a user a token once completed
+    const setEscrowSettings = await erc721EscrowOne
+      .connect(creatorOne)
+      .setEscrowSettings(
+        ERC721RewardOrder.Ascending,
+        ERC721RewardCondition.ObjectiveCompleted,
+        rewardGoal
+      );
+    const setEscrowSettingsReceipt = await setEscrowSettings.wait();
+    const [sortTokenQueueEvent] = setEscrowSettingsReceipt.events.filter(
+      (e: any) => e.event === "SortTokenQueue"
+    );
+
+    //ensure that emitted event arguments are correct
+    const { creator, tokensArr, rewardOrder } = sortTokenQueueEvent.args;
+
+    expect(creator).equal(creatorOne.address, "Incorrect event creator arg");
+    expect(tokensArr.length).equal(50, "Incorrect token arr length");
+    expect(rewardOrder).equal(
+      ERC721RewardOrder.Ascending,
+      "Incorrect reward order arg"
+    );
+
+    //ensure that state has moved to Idle since token queue is not sorted yet
+    const stateAfterEscrowSettings = await erc721EscrowOne.escrowState();
+    expect(stateAfterEscrowSettings).equal(
+      EscrowState.Idle,
+      "Incorrect - state should be Idle until sorted token queue is returned to contract"
+    );
+
+    //simulate an off-chain sorting of the token ids to account for Ascending reward order.
+    //then, return the sorted token queue back to the contract.
+    const returnedTokenIdsToNum = tokensArr.map((tkn: any) => tkn.toNumber());
+    const sortedTokenIdsForAscending = simulateOffChainSortTokens(
+      returnedTokenIdsToNum,
+      rewardOrder
+    );
+    //TODO 2/9 - unifinished test
   });
 });

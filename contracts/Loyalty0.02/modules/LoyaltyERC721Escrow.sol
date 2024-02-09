@@ -10,7 +10,6 @@ import "@openzeppelin/contracts/token/ERC721/IERC721.sol";
 contract LoyaltyERC721Escrow is IERC721Receiver, Ownable {
     enum EscrowState {
         Idle,
-        AwaitingEscrowApprovals,
         DepositPeriod,
         AwaitingEscrowSettings,
         InIssuance,
@@ -121,6 +120,7 @@ contract LoyaltyERC721Escrow is IERC721Receiver, Ownable {
     error OnlyCreatorCanCall();
     error OnlyTeamCanCall();
     error OnlyLoyaltyProgramCanCall();
+    error OnlyTeamOrCreatorCanCall(); 
 
     error DepositsAreLocked();
     error FundsAreLocked();
@@ -451,12 +451,16 @@ contract LoyaltyERC721Escrow is IERC721Receiver, Ownable {
     }
 
     function lookupTokenQueue() external view returns (uint256[] memory) {
-        if (msg.sender != TEAM_ADDRESS) revert OnlyTeamCanCall();
+        if (msg.sender != TEAM_ADDRESS && msg.sender != creator) {
+            revert OnlyTeamOrCreatorCanCall(); 
+        } 
         return tokenQueue;
     }
 
     function getEscrowTokenIds() external view returns (uint256[] memory) {
-        if (msg.sender != TEAM_ADDRESS) revert OnlyTeamCanCall();
+        if (msg.sender != TEAM_ADDRESS && msg.sender != creator) {
+            revert OnlyTeamOrCreatorCanCall();
+        }
         return tokenIds;
     }
 
