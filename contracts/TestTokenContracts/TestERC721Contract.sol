@@ -42,9 +42,9 @@ contract TestERC721Contract is ERC721Enumerable, AccessControl {
     IERC20 _paymentsToken
   ) ERC721(name, symbol) {
     paymentsToken = _paymentsToken;
-    maxMintSupply = 100;
-    mintPrice = 100;
-    maxToMint = 4;
+    maxMintSupply = 2000;
+    mintPrice = 1;
+    maxToMint = 2000;
     _setupRole(DEFAULT_ADMIN_ROLE, msg.sender);
   }
 

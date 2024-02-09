@@ -45,21 +45,6 @@ contract LoyaltyERC721Escrow is IERC721Receiver, Ownable {
     }
 
     event ERC721TokenReceived(
-        address indexed from,
-        uint256 tokenId,
-        uint256 receivedAt
-    );
-    event ERC721CollectionApproved(
-        address collection,
-        address approvedBy,
-        uint256 approvedAt
-    );
-    event ERC721SenderApproved(
-        address sender,
-        address approvedBy,
-        uint256 approvedAt
-    );
-    event ERC721TokenReceived(
         address collectionAddress,
         address from,
         uint256 tokenId,
@@ -93,6 +78,8 @@ contract LoyaltyERC721Escrow is IERC721Receiver, Ownable {
 
     address public constant TEAM_ADDRESS =
         0x262dE7a263d23BeA5544b7a0BF08F2c00BFABE7b;
+    uint256 public constant MAX_DEPOSITORS = 3; 
+
     LoyaltyProgram public loyaltyProgram;
     address public loyaltyProgramAddress;
     address public creator;
@@ -120,13 +107,12 @@ contract LoyaltyERC721Escrow is IERC721Receiver, Ownable {
     mapping(address => bool) isCollectionLoyaltyProgramApproved;
     mapping(bytes32 => bool) private validDepositKeys;
     mapping(address => UserAccount) userAccount;
-
     uint256[] private tokenQueue;
-    uint256 private escrowApprovalsCount;
-
+  
     bool public isAwaitingEscrowApprovals;
     bool public isAwaitingEscrowSettings;
     bool public areEscrowSettingsSet;
+    bool public isDepositKeySet; 
     bool public inIssuance;
     bool public completed;
     bool public allFundsLocked;
@@ -149,16 +135,29 @@ contract LoyaltyERC721Escrow is IERC721Receiver, Ownable {
     error RewardOrderNotSet();
     error NoTokensToWithdraw();
     error LoyaltyProgramMustBeCompleted();
+    error ExceededMaxDepositors(); 
 
     constructor(
         address _loyaltyProgramAddress,
         address _creator,
-        uint256 _programEndsAt
+        uint256 _programEndsAt,
+        address _rewardTokenAddress, 
+        address[] memory _approvedDepositors 
     ) {
         loyaltyProgram = LoyaltyProgram(_loyaltyProgramAddress);
         loyaltyProgramAddress = _loyaltyProgramAddress;
         creator = _creator;
         loyaltyProgramEndsAt = _programEndsAt;
+
+        if (_approvedDepositors.length > MAX_DEPOSITORS ){
+            revert ExceededMaxDepositors();
+        }
+
+        for (uint256 i = 0; i < _approvedDepositors.length; i++){
+            isApprovedSender[_approvedDepositors[i]] = true; 
+        }
+        isCollectionLoyaltyProgramApproved[_rewardTokenAddress] = true; 
+
     }
 
     function version() public pure returns (string memory) {
@@ -174,21 +173,16 @@ contract LoyaltyERC721Escrow is IERC721Receiver, Ownable {
         }
         if (allFundsLocked) return EscrowState.Frozen;
 
-        if (escrowApprovalsCount < 3)
-            return EscrowState.AwaitingEscrowApprovals;
-
         if (
-            escrowApprovalsCount == 3 &&
             depositStartDate <= block.timestamp &&
-            depositEndDate >= block.timestamp
+            depositEndDate >= block.timestamp && isDepositKeySet 
         ) {
             return EscrowState.DepositPeriod;
         }
 
         if (
-            escrowApprovalsCount == 3 &&
             block.timestamp > depositEndDate &&
-            !areEscrowSettingsSet
+            !areEscrowSettingsSet && isDepositKeySet
         ) {
             return EscrowState.AwaitingEscrowSettings;
         }
@@ -483,33 +477,6 @@ contract LoyaltyERC721Escrow is IERC721Receiver, Ownable {
         return isApprovedSender[_sender];
     }
 
-    function approveCollection(
-        address _collectionAddress,
-        bool _isApproved
-    ) external {
-        if (msg.sender != creator) revert OnlyCreatorCanCall();
-        isCollectionLoyaltyProgramApproved[_collectionAddress] = _isApproved;
-
-        if (_isApproved) escrowApprovalsCount++;
-        if (!_isApproved) escrowApprovalsCount--;
-
-        emit ERC721CollectionApproved(
-            _collectionAddress,
-            msg.sender,
-            block.timestamp
-        );
-    }
-
-    function approveSender(address _sender, bool _isApproved) external {
-        if (msg.sender != creator) revert OnlyCreatorCanCall();
-        isApprovedSender[_sender] = _isApproved;
-
-        if (_isApproved) escrowApprovalsCount++;
-        if (!_isApproved) escrowApprovalsCount--;
-
-        emit ERC721SenderApproved(_sender, msg.sender, block.timestamp);
-    }
-
     function setDepositKey(bytes32 key, uint256 _depositEndDate) external {
         if (msg.sender != creator) revert OnlyCreatorCanCall();
 
@@ -527,9 +494,9 @@ contract LoyaltyERC721Escrow is IERC721Receiver, Ownable {
         }
 
         validDepositKeys[key] = true;
-        escrowApprovalsCount++;
         depositStartDate = block.timestamp;
         depositEndDate = _depositEndDate;
+        isDepositKeySet = true; 
     }
 
     function emergencyFreeze(bool _isFrozen) external {

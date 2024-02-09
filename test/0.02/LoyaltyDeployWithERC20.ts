@@ -399,4 +399,5 @@ describe("LoyaltyProgram", () => {
     ];
     expect(payoutIndexToAmount).deep.equal(correctPayoutShape);
   });
+  //...testing for other Loyalty/ERC20 functionality to be done in other files
 });
