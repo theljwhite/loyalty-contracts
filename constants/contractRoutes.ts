@@ -9,3 +9,6 @@ export const VERSION_0_02_ERC721_ESCROW =
   "contracts/Loyalty0.02/modules/LoyaltyERC721Escrow.sol:LoyaltyERC721Escrow";
 export const VERSION_0_02_ERC1155_ESCROW =
   "contracts/Loyalty0.02/modules/LoyaltyERC1155Escrow.sol:LoyaltyERC1155Escrow";
+
+export const VERSION_0_03_ERC1155_ESCROW =
+  "contracts/Loyalty0.02/modules/LoyaltyERC1155Escrow.sol:LoyaltyERC1155Escrow";
