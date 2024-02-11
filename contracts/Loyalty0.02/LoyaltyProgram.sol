@@ -299,7 +299,7 @@ abstract contract LoyaltyProgram is LoyaltySorting {
         users[_user].rewardsEarned += objective.reward;
         users[_user].objectivesCompletedCount++;
 
-        if (tiersAreActive) {
+        if (tiersAreActive) {  
             updateUserTierProgress(_user);
         }
 
@@ -335,7 +335,7 @@ abstract contract LoyaltyProgram is LoyaltySorting {
         }
 
         if (rewardType == RewardType.ERC721) {
-            erc721EscrowContract.handleRewardsUnlock(msg.sender, currentTier);
+            erc721EscrowContract.handleRewardsUnlock(_user, currentTier);
         }
 
         if (

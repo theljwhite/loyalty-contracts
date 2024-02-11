@@ -286,6 +286,7 @@ contract LoyaltyERC721Escrow is IERC721Receiver, Ownable {
             (uint256 rewardsEarned, ) = loyaltyProgram.getUserProgression(
                 _user
             );
+
             if (rewardsEarned >= rewardGoal && !alreadyRewarded) {
                 userAccount[_user].didReachGoal = true;
                 distributeRewardByRewardOrder(_user);

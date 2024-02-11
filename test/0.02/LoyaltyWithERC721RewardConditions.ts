@@ -378,7 +378,5 @@ describe("LoyaltyProgram", () => {
       1,
       "Incorrect - one token should have been rewarded"
     );
-
-    //TODO 2/11 - to be continued (unfinished tests)
   });
 });
