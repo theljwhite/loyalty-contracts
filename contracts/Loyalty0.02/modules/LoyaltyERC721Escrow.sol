@@ -261,7 +261,7 @@ contract LoyaltyERC721Escrow is IERC721Receiver, Ownable {
         }
     }
 
-    function handleRewardsUnlock(address _user, uint256 _rewardGoal) external {
+    function handleRewardsUnlock(address _user, uint256 _rewardGoal, uint256 _rewardGoalTier) external {
         if (msg.sender != loyaltyProgramAddress)
             revert OnlyLoyaltyProgramCanCall();
         if (escrowState() != EscrowState.InIssuance) revert NotInIssuance();
@@ -277,7 +277,7 @@ contract LoyaltyERC721Escrow is IERC721Receiver, Ownable {
             }
         } else if (rewardCondition == RewardCondition.TierReached) {
             if (
-                _rewardGoal > 0 && _rewardGoal >= rewardGoal && !alreadyRewarded
+                _rewardGoalTier > 0 && _rewardGoalTier >= rewardGoal && !alreadyRewarded
             ) {
                 userAccount[_user].didReachGoal = true;
                 distributeRewardByRewardOrder(_user);

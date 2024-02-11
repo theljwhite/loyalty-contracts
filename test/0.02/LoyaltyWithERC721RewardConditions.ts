@@ -7,6 +7,7 @@ import {
   EscrowState,
   ERC721RewardOrder,
   ERC721RewardCondition,
+  ERC1155RewardCondition,
 } from "../../constants/contractEnums";
 import {
   ONE_MONTH_SECONDS,
@@ -379,4 +380,246 @@ describe("LoyaltyProgram", () => {
       "Incorrect - one token should have been rewarded"
     );
   });
+  it("ensures that 0.02 loyalty/escrow correctly processes Ascending rewardOrder with ObjectiveCompleted RewardCondition as users complete objectives", async () => {
+    //loyalty program 2 has a RewardOrder of ascending and a rewardCondition of ObjectiveCompleted.
+    //the objective rewardGoal setup in escrow settings was 2.
+    //the 2 represents objective index 2 in this rewardCondition.
+    //completing objective index 2 should reward a token in Ascending order.
+    //meaning that the lowest token id in the queue should be rewarded,
+    //and then popped from the tokenQueue array.
+
+    //first complete objective indexes 0 and 1 and ensure no token was rewarded yet
+    const escrowTwo = contracts[1].escrow;
+    const loyaltyTwo = contracts[1].loyalty;
+
+    const objectiveIndexZero = 0;
+    const objectiveIndexOne = 1;
+
+    await loyaltyTwo
+      .connect(userOne)
+      .completeUserAuthorityObjective(objectiveIndexZero);
+    await loyaltyTwo
+      .connect(userOne)
+      .completeUserAuthorityObjective(objectiveIndexOne);
+
+    //ensure that no token was rewarded yet but points are tracked
+    const userProgOne = await loyaltyTwo.getUserProgression(userOne.address);
+    const userCompletedObjsOne = await loyaltyTwo.getUserCompletedObjectives(
+      userOne.address
+    );
+    const userEscrowBalOne = await escrowTwo
+      .connect(creatorTwo)
+      .getUserAccount(userOne.address);
+
+    expect(userCompletedObjsOne).deep.equal(
+      [true, true, false, false, false],
+      "Incorrect objectives complete"
+    );
+    expect(userProgOne.rewardsEarned.toNumber()).equal(800, "Incorrect points");
+    expect(userEscrowBalOne.length).equal(0, "No token should be rewarded yet");
+
+    //now complete objective index 2 which should reward a token in ascending order.
+    //since the token queue is sorted for ascending order, the user should be,
+    //rewarded with token id #50 (the lowest token id in this program)
+    const objectiveIndexTwo = 2;
+    await loyaltyTwo
+      .connect(userOne)
+      .completeUserAuthorityObjective(objectiveIndexTwo);
+
+    const userProgTwo = await loyaltyTwo.getUserProgression(userOne.address);
+    const userCompletedObjsTwo = await loyaltyTwo.getUserCompletedObjectives(
+      userOne.address
+    );
+    const userEscrowBalTwo = await escrowTwo
+      .connect(creatorTwo)
+      .getUserAccount(userOne.address);
+    const userEscrowBalTwoToNum = await userEscrowBalTwo.map((bal: any) =>
+      bal.toNumber()
+    );
+
+    expect(userProgTwo.rewardsEarned.toNumber()).equal(
+      1800,
+      "Incorrect points"
+    );
+    expect(userCompletedObjsTwo).deep.equal([true, true, true, false, false]);
+    expect(userEscrowBalTwoToNum).deep.equal(
+      [50],
+      "Incorrect - token id 50 should have been rewarded"
+    );
+
+    //ensure that token id 50 was popped from the token queue array after reward
+    const tokenQueueAfterReward = await escrowTwo
+      .connect(creatorTwo)
+      .lookupTokenQueue();
+    const tokenQueueAfterRewardToNum = tokenQueueAfterReward.map((tkn: any) =>
+      tkn.toNumber()
+    );
+    const correctTokenQueueShapeAfterRew = Array.from(
+      { length: 49 },
+      (_, i) => i + 51
+    ).sort((a, b) => b - a);
+
+    expect(tokenQueueAfterRewardToNum).deep.equal(
+      correctTokenQueueShapeAfterRew,
+      "Incorrect. 50 should be missing from the array (popped)"
+    );
+    expect(tokenQueueAfterRewardToNum.length).equal(49, "Incorrect");
+
+    //complete additional objectives to ensure no more tokens are rewarded.
+    //unlike ERC20 and ERC1155 escrow, the reward conditions for ERC721...
+    //...only allow 1 rewarded token per program for each user.
+    //in ERC20 or ERC1155, creators can reward multiple tokens (such as for each obj or tier complete)
+    //but for now it is not possible with my ERC721 escrow.
+    const objectiveIndexThree = 3;
+    const objectiveIndexFour = 4;
+    await loyaltyTwo
+      .connect(userOne)
+      .completeUserAuthorityObjective(objectiveIndexThree);
+    await loyaltyTwo
+      .connect(creatorTwo)
+      .completeCreatorAuthorityObjective(objectiveIndexFour, userOne.address);
+
+    const finalProg = await loyaltyTwo.getUserProgression(userOne.address);
+    const finalUserCompleteObjs = await loyaltyTwo.getUserCompletedObjectives(
+      userOne.address
+    );
+    const userFinalEscrowBal = await escrowTwo
+      .connect(creatorTwo)
+      .getUserAccount(userOne.address);
+    const finalTokenQueue = await escrowTwo
+      .connect(creatorTwo)
+      .lookupTokenQueue();
+
+    expect(finalProg.rewardsEarned.toNumber()).equal(7800, "Incorrect points");
+    expect(finalUserCompleteObjs).deep.equal(
+      Array(5).fill(true),
+      "Incorrect objs complete"
+    );
+    expect(userFinalEscrowBal.length).equal(
+      1,
+      "No more tokens should have been rewarded"
+    );
+    expect(finalTokenQueue.length).equal(49, "Length should still be 49");
+  });
+  it("ensures that 0.02 loyalty/escrow correctly processes Ascending rewardOrder with TierReached RewardCondition as users complete objectives", async () => {
+    //loyalty program 3 has Ascending rewardOrder and TierReached rewardCondition.
+    //reward goal was set to 2, representing tier index 2.
+    //when a user reaches tier index 2, the user should be rewarded a token in Ascending order.
+
+    //since tiers looked like this: [400, 4400, 7000, 7800]
+    //the contract adds a default "0 tier" so that users dont start out in a tier.
+    //so tier index 2 in this case would be the 4400 (points required).
+    //tiers really look like this in this case: [0, 400, 4400, 7000, 7800];
+    //representing the points required to be placed in each tier.
+
+    //complete first four objectives which will bring points total to 3800.
+    //3800 is not enough points to be placed in tier index 2, so no token should be rewarded.
+    const loyaltyThree = contracts[2].loyalty;
+    const escrowThree = contracts[2].escrow;
+
+    const firstFourObjectives = [0, 1, 2, 3];
+    for (const objective of firstFourObjectives) {
+      await loyaltyThree
+        .connect(userTwo)
+        .completeUserAuthorityObjective(objective);
+    }
+
+    const userProgOne = await loyaltyThree.getUserProgression(userTwo.address);
+    const userCompletedObjsOne = await loyaltyThree.getUserCompletedObjectives(
+      userTwo.address
+    );
+    const userEscrowBalOne = await escrowThree
+      .connect(creatorThree)
+      .getUserAccount(userTwo.address);
+
+    expect(userProgOne.rewardsEarned.toNumber()).equal(
+      3800,
+      "Incorrect points"
+    );
+    expect(userProgOne.currentTier.toNumber()).equal(
+      1,
+      "Incorrect. User should only be in tier index 1"
+    );
+    expect(userCompletedObjsOne).deep.equal(
+      [true, true, true, true, false],
+      "Incorrect complete objs"
+    );
+    expect(userEscrowBalOne.length).equal(0, "No token should be rewarded yet");
+
+    //complete the last objective index.
+    //this will bring points total to 7800 and place the user in the last tier.
+    //in this case, the user is skipping straight from tier 1 to tier 4.
+    //ensure that a token is still rewarded since user surpassed rewardGoal.
+    //the token rewarded should be token id 100 since it is the lowest token id.
+    const objectiveIndexFour = 4;
+    await loyaltyThree
+      .connect(creatorThree)
+      .completeCreatorAuthorityObjective(objectiveIndexFour, userTwo.address);
+
+    const userProgFinal = await loyaltyThree.getUserProgression(
+      userTwo.address
+    );
+    const userCompletedObjsFinal =
+      await loyaltyThree.getUserCompletedObjectives(userTwo.address);
+    const userEscrowBalFinal = await escrowThree
+      .connect(creatorThree)
+      .getUserAccount(userTwo.address);
+    const formattedFinalUserBal = userEscrowBalFinal.map((bal: any) =>
+      bal.toNumber()
+    );
+
+    expect(userProgFinal.rewardsEarned.toNumber()).equal(
+      7800,
+      "Incorrect points"
+    );
+    expect(userProgFinal.currentTier.toNumber()).equal(
+      4,
+      "Incorrect - user should be in last tier"
+    );
+    expect(userCompletedObjsFinal).deep.equal(
+      Array(5).fill(true),
+      "Incorrect - all objs should be complete"
+    );
+    expect(formattedFinalUserBal).deep.equal(
+      [100],
+      "Incorrect - token id 100 should be rewarded"
+    );
+
+    //complete all objectives for a different user, and ensure the next token, 101, is rewarded.
+    //ensure token queue maintained correct shape. tokens 100 and 101 should be popped from the queue.
+    for (const objective of firstFourObjectives) {
+      await loyaltyThree
+        .connect(userThree)
+        .completeUserAuthorityObjective(objective);
+    }
+    await loyaltyThree
+      .connect(creatorThree)
+      .completeCreatorAuthorityObjective(objectiveIndexFour, userThree.address);
+
+    const userThreeBal = await escrowThree
+      .connect(creatorThree)
+      .getUserAccount(userThree.address);
+    const userThreeBalToNum = userThreeBal.map((bal: any) => bal.toNumber());
+
+    const tokenQueueAfterRewards = await escrowThree
+      .connect(creatorThree)
+      .lookupTokenQueue();
+    const tokenQueueAfterRewardsToNum = await tokenQueueAfterRewards.map(
+      (tkn: any) => tkn.toNumber()
+    );
+    const correctFinalTokenQueueShape = Array.from(
+      { length: 48 },
+      (_, i) => i + 102
+    ).sort((a, b) => b - a);
+
+    expect(userThreeBalToNum).deep.equal(
+      [101],
+      "Incorrect rewarded token for user three"
+    );
+    expect(tokenQueueAfterRewardsToNum).deep.equal(
+      correctFinalTokenQueueShape,
+      "Incorrect array. Only tokens 149 through 102 should remain"
+    );
+  });
+  //...to be continued (to test other rewardOrders with rewardConditions)
 });

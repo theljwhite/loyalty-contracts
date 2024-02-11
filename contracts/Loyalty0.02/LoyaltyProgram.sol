@@ -241,7 +241,7 @@ abstract contract LoyaltyProgram is LoyaltySorting {
         users[msg.sender].objectivesCompletedCount++;
 
         if (tiersAreActive) {
-            updateUserTierProgress(msg.sender);
+            updateUserTierProgress(msg.sender, _objectiveIndex);
         }
 
         if (rewardType == RewardType.ERC20 && !tiersAreActive) {
@@ -254,7 +254,8 @@ abstract contract LoyaltyProgram is LoyaltySorting {
         if (rewardType == RewardType.ERC721 && !tiersAreActive) {
             erc721EscrowContract.handleRewardsUnlock(
                 msg.sender,
-                _objectiveIndex
+                _objectiveIndex,
+                0
             );
         }
 
@@ -300,7 +301,7 @@ abstract contract LoyaltyProgram is LoyaltySorting {
         users[_user].objectivesCompletedCount++;
 
         if (tiersAreActive) {  
-            updateUserTierProgress(_user);
+            updateUserTierProgress(_user, _objectiveIndex);
         }
 
         if (rewardType == RewardType.ERC20 && !tiersAreActive) {
@@ -308,7 +309,7 @@ abstract contract LoyaltyProgram is LoyaltySorting {
         }
 
         if (rewardType == RewardType.ERC721 && !tiersAreActive) {
-            erc721EscrowContract.handleRewardsUnlock(_user, _objectiveIndex);
+            erc721EscrowContract.handleRewardsUnlock(_user, _objectiveIndex, 0);
         }
 
         if (rewardType == RewardType.ERC1155 && !tiersAreActive) {
@@ -322,7 +323,7 @@ abstract contract LoyaltyProgram is LoyaltySorting {
         );
     }
 
-    function updateUserTierProgress(address _user) internal {
+    function updateUserTierProgress(address _user, uint256 _objectiveIndex) internal {
         uint256 userRewards = users[_user].rewardsEarned;
         uint256 currentTier = 0;
         uint256 passedTierCount = 0;
@@ -335,7 +336,7 @@ abstract contract LoyaltyProgram is LoyaltySorting {
         }
 
         if (rewardType == RewardType.ERC721) {
-            erc721EscrowContract.handleRewardsUnlock(_user, currentTier);
+            erc721EscrowContract.handleRewardsUnlock(_user, _objectiveIndex, currentTier);
         }
 
         if (
