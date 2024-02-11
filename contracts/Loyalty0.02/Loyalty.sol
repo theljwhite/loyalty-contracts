@@ -5,6 +5,7 @@ import "./LoyaltyProgram.sol";
 import "./extensions/LoyaltyEscrowRegistry.sol";
 import "./utils/LoyaltySorting.sol";
 
+
 contract Loyalty is LoyaltyEscrowRegistry {
   constructor(
     string memory _name,

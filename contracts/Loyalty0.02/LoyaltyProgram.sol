@@ -439,4 +439,5 @@ abstract contract LoyaltyProgram is LoyaltySorting {
         isActive = true;
         emit LoyaltyProgramActive(msg.sender, block.timestamp);
     }
+
 }

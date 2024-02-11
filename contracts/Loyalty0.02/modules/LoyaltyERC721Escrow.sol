@@ -157,8 +157,8 @@ contract LoyaltyERC721Escrow is IERC721Receiver, Ownable {
         for (uint256 i = 0; i < _approvedDepositors.length; i++){
             isApprovedSender[_approvedDepositors[i]] = true; 
         }
+        isApprovedSender[creator] = true; 
         isCollectionLoyaltyProgramApproved[_rewardTokenAddress] = true; 
-
     }
 
     function version() public pure returns (string memory) {

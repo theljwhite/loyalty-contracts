@@ -24,3 +24,7 @@ export const tierNamesBytes32 = tierNames.map((tier) =>
   hre.ethers.utils.formatBytes32String(tier)
 );
 export const tierRewardsRequired = [400, 4400, 7000, 7800];
+
+export const sampleDepositKey = "clscttni60000356tqrpthp7b";
+export const depositKeyBytes32 =
+  hre.ethers.utils.formatBytes32String(sampleDepositKey);

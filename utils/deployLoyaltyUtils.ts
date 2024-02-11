@@ -9,6 +9,7 @@ import {
   rewards,
   tierNamesBytes32,
   tierRewardsRequired,
+  depositKeyBytes32,
 } from "../constants/basicLoyaltyConstructorArgs";
 import { ONE_MONTH_SECONDS, TWO_DAYS_MS } from "../constants/timeAndDate";
 import type { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers";
@@ -24,6 +25,8 @@ import type { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers";
 type DeployLoyaltyReturn = {
   loyaltyAddress: string;
   escrowAddress?: string;
+  loyaltyContract: any;
+  escrowContract?: any;
 };
 
 export const deployLoyaltyProgram = async (
@@ -60,7 +63,10 @@ export const deployLoyaltyProgram = async (
     );
 
   if (rewardType === RewardType.Points) {
-    return { loyaltyAddress: newLoyaltyProgram.address };
+    return {
+      loyaltyAddress: newLoyaltyProgram.address,
+      loyaltyContract: newLoyaltyProgram,
+    };
   } else {
     const rewardTypeEnumAsString = RewardType[rewardType];
     const escrowFactoryRoute =
@@ -84,6 +90,8 @@ export const deployLoyaltyProgram = async (
     return {
       loyaltyAddress: newLoyaltyProgram.address,
       escrowAddress: escrowContract.address,
+      loyaltyContract: newLoyaltyProgram,
+      escrowContract,
     };
   }
 };
@@ -123,9 +131,6 @@ export const deployProgramAndSetUpUntilDepositPeriod = async (
       escrowAddress
     );
 
-    const sampleDepositKey = "clscttni60000356tqrpthp7b";
-    const depositKeyBytes32 =
-      hre.ethers.utils.formatBytes32String(sampleDepositKey);
     const datePlusTwoDays = new Date().getTime() + TWO_DAYS_MS;
     const depositEndDate = Math.round(datePlusTwoDays / 1000);
 
@@ -133,10 +138,15 @@ export const deployProgramAndSetUpUntilDepositPeriod = async (
       .connect(creator)
       .setDepositKey(depositKeyBytes32, depositEndDate);
 
-    return { loyaltyAddress, escrowAddress };
+    return {
+      loyaltyAddress,
+      escrowAddress,
+      loyaltyContract: loyaltyProgram,
+      escrowContract: escrow,
+    };
   } else {
     await loyaltyProgram.setLoyaltyProgramActive();
-    return { loyaltyAddress };
+    return { loyaltyAddress, loyaltyContract: loyaltyProgram };
   }
 };
 
@@ -168,6 +178,22 @@ export const handleTestERC721DeployMintAndTransfer = async (
   return { balance: creatorBalance, testERC721Contract: testERC721Collection };
 };
 
+export const handleTransferTestERC721ToEscrow = async (
+  tokenIdStart: number,
+  tokenIdEnd: number,
+  testCollectionContract: any,
+  escrowAddress: string,
+  creator: SignerWithAddress
+): Promise<void> => {
+  for (let i = tokenIdStart; i < tokenIdEnd; i++) {
+    await testCollectionContract
+      .connect(creator)
+      [
+        "safeTransferFrom(address,address,uint256,bytes)"
+      ](creator.address, escrowAddress, i, depositKeyBytes32);
+  }
+};
+
 export const handleTestERC1155TokenTransfer = async (
   testERC1155Contract: any,
   creator: SignerWithAddress,
@@ -192,4 +218,25 @@ export const handleTestERC1155TokenTransfer = async (
     testERC1155TokenIds
   );
   return balanceOfCreator;
+};
+
+export const transferERC721 = async (
+  tokenIdStart: number,
+  tokenIdEnd: number,
+  from: SignerWithAddress,
+  to: SignerWithAddress,
+  collection: any
+): Promise<{ receiverBalance: any; senderBalance: any }> => {
+  for (let i = tokenIdStart; i < tokenIdEnd; i++) {
+    await collection
+      .connect(from)
+      [
+        "safeTransferFrom(address,address,uint256)"
+      ](from.address, to.address, i);
+  }
+
+  const balanceOfSender = await collection.balanceOf(from.address);
+  const balanceOfReceiver = await collection.balanceOf(to.address);
+
+  return { receiverBalance: balanceOfReceiver, senderBalance: balanceOfSender };
 };
