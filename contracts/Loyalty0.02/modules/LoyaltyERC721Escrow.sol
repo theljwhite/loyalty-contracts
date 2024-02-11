@@ -107,7 +107,7 @@ contract LoyaltyERC721Escrow is IERC721Receiver, Ownable {
     mapping(bytes32 => bool) private validDepositKeys;
     mapping(address => UserAccount) userAccount;
     uint256[] private tokenQueue;
-  
+
     bool public isAwaitingEscrowApprovals;
     bool public isAwaitingEscrowSettings;
     bool public areEscrowSettingsSet;
@@ -468,7 +468,7 @@ contract LoyaltyERC721Escrow is IERC721Receiver, Ownable {
     function getUserAccount(
         address _user
     ) external view returns (uint256[] memory tokenBalance) {
-        if (msg.sender != TEAM_ADDRESS) revert OnlyTeamCanCall();
+        if (msg.sender != TEAM_ADDRESS && msg.sender != creator) revert OnlyTeamOrCreatorCanCall();
         return (userAccount[_user].rewardedTokenBalance);
     }
 

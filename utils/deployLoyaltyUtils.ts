@@ -87,6 +87,10 @@ export const deployLoyaltyProgram = async (
         [creator.address]
       );
 
+    await newLoyaltyProgram
+      .connect(creator)
+      .setEscrowContract(escrowContract.address, rewardType);
+
     return {
       loyaltyAddress: newLoyaltyProgram.address,
       escrowAddress: escrowContract.address,
@@ -130,6 +134,10 @@ export const deployProgramAndSetUpUntilDepositPeriod = async (
       escrowFactoryRoute,
       escrowAddress
     );
+
+    await loyaltyProgram
+      .connect(creator)
+      .setEscrowContract(escrowAddress, rewardType);
 
     const datePlusTwoDays = new Date().getTime() + TWO_DAYS_MS;
     const depositEndDate = Math.round(datePlusTwoDays / 1000);

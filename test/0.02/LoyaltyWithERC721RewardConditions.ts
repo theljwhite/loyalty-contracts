@@ -1,4 +1,3 @@
-import { time } from "@nomicfoundation/hardhat-toolbox-viem/network-helpers";
 import { expect } from "chai";
 import hre from "hardhat";
 import { type SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers";
@@ -21,6 +20,8 @@ import {
   handleTransferTestERC721ToEscrow,
   transferERC721,
 } from "../../utils/deployLoyaltyUtils";
+import { simulateOffChainSortTokens } from "../../utils/sortTokens";
+import { depositKeyBytes32 } from "../../constants/basicLoyaltyConstructorArgs";
 
 type CreatorContracts = {
   loyaltyAddress: string;
@@ -226,17 +227,158 @@ describe("LoyaltyProgram", () => {
         ERC721RewardCondition.PointsTotal,
         pointsRewardGoal
       );
+    const setSettingsOneReceipt = await setSettingsOne.wait();
+    setSettingsReceipts.push(setSettingsOneReceipt);
 
     for (let i = 1; i < contracts.length; i++) {
       const setSettings = await contracts[i].escrow
         .connect(loyaltyCreators[i])
         .setEscrowSettings(ERC721RewardOrder.Ascending, i, indexRewardGoal);
+      const receipt = await setSettings.wait();
+      setSettingsReceipts.push(receipt);
     }
 
     //sort token queues emitted from setEscrowSettings calls.
     //return the token queues back to the contracts.
-    //after it is returned, contracts are InIssuance and ready to test objective completion.
+    //after they are returned, contracts are InIssuance and ready to test objective completion.
+    type SortTokenQueueArgs = {
+      creator: string;
+      tokensArr: number[];
+      rewardOrder: ERC721RewardOrder;
+    };
+    const sortTokenQueueEventArgs: SortTokenQueueArgs[] = [];
 
-    //...TODO: 2/10 - unfinished
+    for (let i = 0; i < setSettingsReceipts.length; i++) {
+      const [sortTokenQueueEvent] = setSettingsReceipts[i].events.filter(
+        (e: any) => e.event === "SortTokenQueue"
+      );
+      const { creator, tokensArr, rewardOrder } = sortTokenQueueEvent.args;
+      const formattedTokensArr = tokensArr.map((tkn: any) => tkn.toNumber());
+      sortTokenQueueEventArgs.push({
+        creator,
+        tokensArr: formattedTokensArr,
+        rewardOrder,
+      });
+    }
+
+    //simulate off-chain sort based on emitted SortTokenQueue events arguments
+    const sortedTokensByRewardOrder: Array<number[]> = [];
+    for (let i = 0; i < sortTokenQueueEventArgs.length; i++) {
+      const sortedTokens = simulateOffChainSortTokens(
+        sortTokenQueueEventArgs[i].tokensArr,
+        sortTokenQueueEventArgs[i].rewardOrder
+      );
+      sortedTokensByRewardOrder.push(sortedTokens);
+    }
+
+    //return the sorted token id arrays back to the respective contracts and set loyalty programs active.
+    //ensure state for each is now InIssuance (ready for users to complete objectives and be rewarded).
+    const escrowStatesAfterQueue: EscrowState[] = [];
+    const loyaltyStatesAfterQueue: LoyaltyState[] = [];
+    for (let i = 0; i < contracts.length; i++) {
+      await contracts[i].escrow
+        .connect(loyaltyCreators[i])
+        .receiveTokenQueue(sortedTokensByRewardOrder[i], depositKeyBytes32);
+      await contracts[i].loyalty
+        .connect(loyaltyCreators[i])
+        .setLoyaltyProgramActive();
+      const escrowState = await contracts[i].escrow.escrowState();
+      const loyaltyState = await contracts[i].loyalty.state();
+
+      escrowStatesAfterQueue.push(escrowState);
+      loyaltyStatesAfterQueue.push(loyaltyState);
+    }
+
+    expect(escrowStatesAfterQueue).deep.equal(
+      Array(contracts.length).fill(EscrowState.InIssuance),
+      "Incorrect - all escrow contracts should be InIssuance"
+    );
+    expect(loyaltyStatesAfterQueue).deep.equal(
+      Array(contracts.length).fill(LoyaltyState.Active),
+      "Incorrect - loyalty states should be active"
+    );
+    //contracts are now InIssuance and ready for further testing.
+  });
+  it("ensures that 0.02 loyalty/escrow correctly processes Random rewardOrder with PointsTotal RewardCondition as users complete objectives", async () => {
+    //loyalty program one has a Random rewardOrder and PointsTotal rewardCondition.
+    //7000 was set as the PointsTotal reward goal.
+    //so when a user reaches 7000 points, they should be rewarded a random token id.
+
+    //complete first three objectives. 7000 is not reached yet so no tokens should be rewarded.
+    const loyaltyOne = contracts[0].loyalty;
+    const escrowOne = contracts[0].escrow;
+    const firstObjectivesToComplete = [0, 1, 2];
+
+    for (let i = 0; i < firstObjectivesToComplete.length; i++) {
+      const objectiveIndex = i;
+      await loyaltyOne
+        .connect(userOne)
+        .completeUserAuthorityObjective(objectiveIndex);
+    }
+
+    //completing first three objectives will bring points total to 1800.
+    //ensure user records are correct, and ensure no tokens rewarded yet.
+    const userCompleteObjsOne = await loyaltyOne.getUserCompletedObjectives(
+      userOne.address
+    );
+    const userProgOne = await loyaltyOne.getUserProgression(userOne.address);
+
+    expect(userCompleteObjsOne).deep.equal(
+      [true, true, true, false, false],
+      "Incorrect objectives complete"
+    );
+    expect(userProgOne.rewardsEarned.toNumber()).equal(
+      1800,
+      "Incorrect points"
+    );
+    expect(userProgOne.currentTier.toNumber()).equal(1, "Incorrect tier");
+
+    const userEscrowBalOne = await escrowOne
+      .connect(creatorOne)
+      .getUserAccount(userOne.address);
+    expect(userEscrowBalOne.length).equal(
+      0,
+      "Incorrect - no tkns should be rewarded to user one"
+    );
+
+    //complete the remaining two objectives.
+    //this will bring points total to 7800 which passes 7000 rewardGoal.
+    //this should reward a token (in random order) to user one's escrow account.
+    //Objective index 4 is CREATOR authority which means it must be marked completed by contract creator.
+    const objectiveIndexThree = 3;
+    const objectiveIndexFour = 4;
+
+    await loyaltyOne
+      .connect(userOne)
+      .completeUserAuthorityObjective(objectiveIndexThree);
+
+    await loyaltyOne
+      .connect(creatorOne)
+      .completeCreatorAuthorityObjective(objectiveIndexFour, userOne.address);
+
+    //ensure points total, etc is correct.
+    //ensure that a token in random order is rewarded.
+    const userFinalCompletions = await loyaltyOne.getUserCompletedObjectives(
+      userOne.address
+    );
+    const userProgFinal = await loyaltyOne.getUserProgression(userOne.address);
+
+    expect(userFinalCompletions).deep.equal(Array(5).fill(true));
+    expect(userProgFinal.currentTier.toNumber()).equal(4, "Incorrect tier");
+    expect(userProgFinal.rewardsEarned.toNumber()).equal(
+      7800,
+      "Incorrect points"
+    );
+
+    const userEscrowFinalBal = await escrowOne
+      .connect(creatorOne)
+      .getUserAccount(userOne.address);
+
+    expect(userEscrowFinalBal.length).equal(
+      1,
+      "Incorrect - one token should have been rewarded"
+    );
+
+    //TODO 2/11 - to be continued (unfinished tests)
   });
 });
