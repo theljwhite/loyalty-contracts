@@ -6,7 +6,6 @@ import "@openzeppelin/contracts/token/ERC1155/utils/ERC1155Holder.sol";
 import "@openzeppelin/contracts/token/ERC1155/ERC1155.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 
-import "hardhat/console.sol";
 
 contract LoyaltyERC1155Escrow is ERC1155Holder, Ownable {
     enum EscrowState {
@@ -369,7 +368,6 @@ contract LoyaltyERC1155Escrow is ERC1155Holder, Ownable {
             escrow.rewardCondition == RewardCondition.EachObjective ||
             escrow.rewardCondition == RewardCondition.SingleObjective
         ) {
-            console.log("ran"); 
             unlockRewardsByObjective(_user, _objIndex);
         } else if (
             escrow.rewardCondition == RewardCondition.EachTier ||
