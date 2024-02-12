@@ -77,7 +77,7 @@ contract LoyaltyERC721Escrow is IERC721Receiver, Ownable {
 
     address public constant TEAM_ADDRESS =
         0x262dE7a263d23BeA5544b7a0BF08F2c00BFABE7b;
-    uint256 public constant MAX_DEPOSITORS = 3; 
+    uint256 public constant MAX_DEPOSITORS = 3;
 
     LoyaltyProgram public loyaltyProgram;
     address public loyaltyProgramAddress;
@@ -111,7 +111,7 @@ contract LoyaltyERC721Escrow is IERC721Receiver, Ownable {
     bool public isAwaitingEscrowApprovals;
     bool public isAwaitingEscrowSettings;
     bool public areEscrowSettingsSet;
-    bool public isDepositKeySet; 
+    bool public isDepositKeySet;
     bool public inIssuance;
     bool public completed;
     bool public allFundsLocked;
@@ -120,7 +120,7 @@ contract LoyaltyERC721Escrow is IERC721Receiver, Ownable {
     error OnlyCreatorCanCall();
     error OnlyTeamCanCall();
     error OnlyLoyaltyProgramCanCall();
-    error OnlyTeamOrCreatorCanCall(); 
+    error OnlyTeamOrCreatorCanCall();
 
     error DepositsAreLocked();
     error FundsAreLocked();
@@ -135,30 +135,30 @@ contract LoyaltyERC721Escrow is IERC721Receiver, Ownable {
     error RewardOrderNotSet();
     error NoTokensToWithdraw();
     error LoyaltyProgramMustBeCompleted();
-    error ExceededMaxDepositors(); 
-    error IncorrectDepositKey(); 
+    error ExceededMaxDepositors();
+    error IncorrectDepositKey();
 
     constructor(
         address _loyaltyProgramAddress,
         address _creator,
         uint256 _programEndsAt,
-        address _rewardTokenAddress, 
-        address[] memory _approvedDepositors 
+        address _rewardTokenAddress,
+        address[] memory _approvedDepositors
     ) {
         loyaltyProgram = LoyaltyProgram(_loyaltyProgramAddress);
         loyaltyProgramAddress = _loyaltyProgramAddress;
         creator = _creator;
         loyaltyProgramEndsAt = _programEndsAt;
 
-        if (_approvedDepositors.length > MAX_DEPOSITORS ){
+        if (_approvedDepositors.length > MAX_DEPOSITORS) {
             revert ExceededMaxDepositors();
         }
 
-        for (uint256 i = 0; i < _approvedDepositors.length; i++){
-            isApprovedSender[_approvedDepositors[i]] = true; 
+        for (uint256 i = 0; i < _approvedDepositors.length; i++) {
+            isApprovedSender[_approvedDepositors[i]] = true;
         }
-        isApprovedSender[creator] = true; 
-        isCollectionLoyaltyProgramApproved[_rewardTokenAddress] = true; 
+        isApprovedSender[creator] = true;
+        isCollectionLoyaltyProgramApproved[_rewardTokenAddress] = true;
     }
 
     function version() public pure returns (string memory) {
@@ -176,14 +176,16 @@ contract LoyaltyERC721Escrow is IERC721Receiver, Ownable {
 
         if (
             depositStartDate <= block.timestamp &&
-            depositEndDate >= block.timestamp && isDepositKeySet 
+            depositEndDate >= block.timestamp &&
+            isDepositKeySet
         ) {
             return EscrowState.DepositPeriod;
         }
 
         if (
             block.timestamp > depositEndDate &&
-            !areEscrowSettingsSet && isDepositKeySet
+            !areEscrowSettingsSet &&
+            isDepositKeySet
         ) {
             return EscrowState.AwaitingEscrowSettings;
         }
@@ -261,7 +263,11 @@ contract LoyaltyERC721Escrow is IERC721Receiver, Ownable {
         }
     }
 
-    function handleRewardsUnlock(address _user, uint256 _rewardGoal, uint256 _rewardGoalTier) external {
+    function handleRewardsUnlock(
+        address _user,
+        uint256 _rewardGoal,
+        uint256 _rewardGoalTier
+    ) external {
         if (msg.sender != loyaltyProgramAddress)
             revert OnlyLoyaltyProgramCanCall();
         if (escrowState() != EscrowState.InIssuance) revert NotInIssuance();
@@ -277,7 +283,9 @@ contract LoyaltyERC721Escrow is IERC721Receiver, Ownable {
             }
         } else if (rewardCondition == RewardCondition.TierReached) {
             if (
-                _rewardGoalTier > 0 && _rewardGoalTier >= rewardGoal && !alreadyRewarded
+                _rewardGoalTier > 0 &&
+                _rewardGoalTier >= rewardGoal &&
+                !alreadyRewarded
             ) {
                 userAccount[_user].didReachGoal = true;
                 distributeRewardByRewardOrder(_user);
@@ -412,10 +420,15 @@ contract LoyaltyERC721Escrow is IERC721Receiver, Ownable {
         emit SortTokenQueue(_sender, tokenIds, _rewardOrder, block.timestamp);
     }
 
-    function receiveTokenQueue(uint256[] memory _sortedTokenQueue, bytes32 _depositKey) external {
-        if (msg.sender != TEAM_ADDRESS && msg.sender != creator) revert OnlyTeamOrCreatorCanCall();
-        if (_sortedTokenQueue.length != tokenIds.length) revert TokenQueueLengthMismatch();
-        if (!validDepositKeys[_depositKey]) revert IncorrectDepositKey(); 
+    function receiveTokenQueue(
+        uint256[] memory _sortedTokenQueue,
+        bytes32 _depositKey
+    ) external {
+        if (msg.sender != TEAM_ADDRESS && msg.sender != creator)
+            revert OnlyTeamOrCreatorCanCall();
+        if (_sortedTokenQueue.length != tokenIds.length)
+            revert TokenQueueLengthMismatch();
+        if (!validDepositKeys[_depositKey]) revert IncorrectDepositKey();
 
         tokenQueue = _sortedTokenQueue;
         inIssuance = true;
@@ -454,8 +467,8 @@ contract LoyaltyERC721Escrow is IERC721Receiver, Ownable {
 
     function lookupTokenQueue() external view returns (uint256[] memory) {
         if (msg.sender != TEAM_ADDRESS && msg.sender != creator) {
-            revert OnlyTeamOrCreatorCanCall(); 
-        } 
+            revert OnlyTeamOrCreatorCanCall();
+        }
         return tokenQueue;
     }
 
@@ -469,7 +482,8 @@ contract LoyaltyERC721Escrow is IERC721Receiver, Ownable {
     function getUserAccount(
         address _user
     ) external view returns (uint256[] memory tokenBalance) {
-        if (msg.sender != TEAM_ADDRESS && msg.sender != creator) revert OnlyTeamOrCreatorCanCall();
+        if (msg.sender != TEAM_ADDRESS && msg.sender != creator)
+            revert OnlyTeamOrCreatorCanCall();
         return (userAccount[_user].rewardedTokenBalance);
     }
 
@@ -502,7 +516,7 @@ contract LoyaltyERC721Escrow is IERC721Receiver, Ownable {
         validDepositKeys[key] = true;
         depositStartDate = block.timestamp;
         depositEndDate = _depositEndDate;
-        isDepositKeySet = true; 
+        isDepositKeySet = true;
     }
 
     function emergencyFreeze(bool _isFrozen) external {

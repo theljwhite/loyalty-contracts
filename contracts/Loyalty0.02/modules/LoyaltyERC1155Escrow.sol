@@ -6,6 +6,8 @@ import "@openzeppelin/contracts/token/ERC1155/utils/ERC1155Holder.sol";
 import "@openzeppelin/contracts/token/ERC1155/ERC1155.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 
+import "hardhat/console.sol";
+
 contract LoyaltyERC1155Escrow is ERC1155Holder, Ownable {
     enum EscrowState {
         Idle,
@@ -104,7 +106,7 @@ contract LoyaltyERC1155Escrow is ERC1155Holder, Ownable {
     address public loyaltyProgramAddress;
     address public constant TEAM_ADDRESS =
         0x262dE7a263d23BeA5544b7a0BF08F2c00BFABE7b;
-    uint256 public constant MAX_DEPOSITORS = 3; 
+    uint256 public constant MAX_DEPOSITORS = 3;
 
     address public creator;
     uint256 public constant PAYOUT_BUFFER = 4;
@@ -116,7 +118,7 @@ contract LoyaltyERC1155Escrow is ERC1155Holder, Ownable {
 
     bool public areEscrowSettingsSet;
     bool public inIssuance;
-    bool public isDepositKeySet; 
+    bool public isDepositKeySet;
     bool public allFundsLocked;
     bool public canceled;
 
@@ -133,7 +135,7 @@ contract LoyaltyERC1155Escrow is ERC1155Holder, Ownable {
     error OnlyCreatorCanCall();
 
     error ExceededMaxTokenIdsAmount();
-    error ExceededMaxDepositors(); 
+    error ExceededMaxDepositors();
     error OnlyLoyaltyProgramCanCall();
 
     error LoyaltyProgramMustBeIdle();
@@ -163,8 +165,8 @@ contract LoyaltyERC1155Escrow is ERC1155Holder, Ownable {
     constructor(
         address _loyaltyProgramAddress,
         address _creator,
-        uint256 _programEndsAt, 
-        address _rewardTokenAddress, 
+        uint256 _programEndsAt,
+        address _rewardTokenAddress,
         address[] memory _approvedDepositors
     ) {
         creator = _creator;
@@ -172,14 +174,14 @@ contract LoyaltyERC1155Escrow is ERC1155Holder, Ownable {
         loyaltyProgramAddress = _loyaltyProgramAddress;
         loyaltyProgramEndsAt = _programEndsAt;
 
-        if (_approvedDepositors.length > MAX_DEPOSITORS){
-            revert ExceededMaxDepositors(); 
+        if (_approvedDepositors.length > MAX_DEPOSITORS) {
+            revert ExceededMaxDepositors();
         }
 
-        for (uint256 i = 0; i < _approvedDepositors.length; i++){
-            isApprovedSender[_approvedDepositors[i]] = true; 
+        for (uint256 i = 0; i < _approvedDepositors.length; i++) {
+            isApprovedSender[_approvedDepositors[i]] = true;
         }
-        isCollectionLoyaltyProgramApproved[_rewardTokenAddress] = true; 
+        isCollectionLoyaltyProgramApproved[_rewardTokenAddress] = true;
     }
 
     function version() public pure returns (string memory) {
@@ -197,13 +199,15 @@ contract LoyaltyERC1155Escrow is ERC1155Holder, Ownable {
 
         if (
             depositStartDate <= block.timestamp &&
-            depositEndDate >= block.timestamp && isDepositKeySet
+            depositEndDate >= block.timestamp &&
+            isDepositKeySet
         ) {
             return EscrowState.DepositPeriod;
         }
         if (
             block.timestamp > depositEndDate &&
-            !areEscrowSettingsSet && isDepositKeySet
+            !areEscrowSettingsSet &&
+            isDepositKeySet
         ) {
             return EscrowState.AwaitingEscrowSettings;
         }
@@ -347,43 +351,34 @@ contract LoyaltyERC1155Escrow is ERC1155Holder, Ownable {
         }
     }
 
-    function handleRewardsUnlock(address _user, uint256 _rewardGoal) external {
-        if (msg.sender != loyaltyProgramAddress)
-            revert OnlyLoyaltyProgramCanCall();
-        if (escrowState() != EscrowState.InIssuance) revert NotInIssuance();
-        if (
-            escrow.rewardCondition != RewardCondition.EachObjective &&
-            escrow.rewardCondition != RewardCondition.SingleObjective &&
-            escrow.rewardCondition != RewardCondition.PointsTotal
-        ) {
-            revert IncorrectRewardCondition();
-        }
-
-        if (
-            escrow.rewardCondition == RewardCondition.SingleObjective ||
-            escrow.rewardCondition == RewardCondition.EachObjective
-        ) {
-            unlockRewardsByObjective(_user, _rewardGoal);
-        } else {
-            unlockRewardsByPointsTotal(_user);
-        }
-    }
-
-    function handleTierRewardsUnlock(
+    function handleRewardsUnlock(
         address _user,
+        uint256 _objIndex,
         uint256 _tierIndex,
         uint256[] memory _passedTiers
     ) external {
         if (msg.sender != loyaltyProgramAddress)
             revert OnlyLoyaltyProgramCanCall();
+
         if (escrowState() != EscrowState.InIssuance) revert NotInIssuance();
-        if (
-            escrow.rewardCondition != RewardCondition.EachTier &&
-            escrow.rewardCondition != RewardCondition.SingleTier
-        ) {
+        if (escrow.rewardCondition == RewardCondition.NotSet) {
             revert IncorrectRewardCondition();
         }
-        unlockRewardsByTier(_user, _tierIndex, _passedTiers);
+
+        if (
+            escrow.rewardCondition == RewardCondition.EachObjective ||
+            escrow.rewardCondition == RewardCondition.SingleObjective
+        ) {
+            console.log("ran"); 
+            unlockRewardsByObjective(_user, _objIndex);
+        } else if (
+            escrow.rewardCondition == RewardCondition.EachTier ||
+            escrow.rewardCondition == RewardCondition.SingleTier
+        ) {
+            unlockRewardsByTier(_user, _tierIndex, _passedTiers);
+        } else {
+            unlockRewardsByPointsTotal(_user);
+        }
     }
 
     function unlockRewardsByObjective(
@@ -844,7 +839,7 @@ contract LoyaltyERC1155Escrow is ERC1155Holder, Ownable {
     }
 
     function getEscrowRewardDetails()
-        public
+        external
         view
         returns (uint256 rewardGoal, RewardCondition rewardCondition)
     {
@@ -883,7 +878,7 @@ contract LoyaltyERC1155Escrow is ERC1155Holder, Ownable {
         validDepositKeys[key] = true;
         depositStartDate = block.timestamp;
         depositEndDate = _depositEndDate;
-        isDepositKeySet = true; 
+        isDepositKeySet = true;
     }
 
     function emergencyFreeze(bool _isFrozen) external {

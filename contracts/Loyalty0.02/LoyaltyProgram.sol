@@ -262,7 +262,9 @@ abstract contract LoyaltyProgram is LoyaltySorting {
         if (rewardType == RewardType.ERC1155 && !tiersAreActive) {
             erc1155EscrowContract.handleRewardsUnlock(
                 msg.sender,
-                _objectiveIndex
+                _objectiveIndex,
+                0,
+                new uint256[](0)
             );
         }
 
@@ -300,7 +302,7 @@ abstract contract LoyaltyProgram is LoyaltySorting {
         users[_user].rewardsEarned += objective.reward;
         users[_user].objectivesCompletedCount++;
 
-        if (tiersAreActive) {  
+        if (tiersAreActive) {
             updateUserTierProgress(_user, _objectiveIndex);
         }
 
@@ -313,7 +315,12 @@ abstract contract LoyaltyProgram is LoyaltySorting {
         }
 
         if (rewardType == RewardType.ERC1155 && !tiersAreActive) {
-            erc1155EscrowContract.handleRewardsUnlock(_user, _objectiveIndex);
+            erc1155EscrowContract.handleRewardsUnlock(
+                _user,
+                _objectiveIndex,
+                0,
+                new uint256[](0)
+            );
         }
 
         emit OwnerAuthorityObjectiveCompleted(
@@ -323,7 +330,10 @@ abstract contract LoyaltyProgram is LoyaltySorting {
         );
     }
 
-    function updateUserTierProgress(address _user, uint256 _objectiveIndex) internal {
+    function updateUserTierProgress(
+        address _user,
+        uint256 _objectiveIndex
+    ) internal {
         uint256 userRewards = users[_user].rewardsEarned;
         uint256 currentTier = 0;
         uint256 passedTierCount = 0;
@@ -336,7 +346,11 @@ abstract contract LoyaltyProgram is LoyaltySorting {
         }
 
         if (rewardType == RewardType.ERC721) {
-            erc721EscrowContract.handleRewardsUnlock(_user, _objectiveIndex, currentTier);
+            erc721EscrowContract.handleRewardsUnlock(
+                _user,
+                _objectiveIndex,
+                currentTier
+            );
         }
 
         if (
@@ -352,8 +366,9 @@ abstract contract LoyaltyProgram is LoyaltySorting {
             }
 
             if (rewardType == RewardType.ERC1155) {
-                erc1155EscrowContract.handleTierRewardsUnlock(
+                erc1155EscrowContract.handleRewardsUnlock(
                     _user,
+                    _objectiveIndex, 
                     currentTier,
                     passedTiers
                 );
@@ -440,5 +455,4 @@ abstract contract LoyaltyProgram is LoyaltySorting {
         isActive = true;
         emit LoyaltyProgramActive(msg.sender, block.timestamp);
     }
-
 }

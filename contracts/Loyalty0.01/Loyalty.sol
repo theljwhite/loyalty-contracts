@@ -6,23 +6,23 @@ import "./extensions/LoyaltyEscrowRegistry.sol";
 import "./utils/LoyaltySorting.sol";
 
 contract Loyalty is LoyaltyEscrowRegistry {
-  constructor(
-    string memory _name,
-    bytes32[] memory _targetObjectives,
-    bytes32[] memory _authorities,
-    uint256[] memory _rewards,
-    RewardType _rewardType,
-    uint256 _programEndsAt,
-    bool _tiersSortingActive
-  )
-    LoyaltyProgram(
-      _name,
-      _targetObjectives,
-      _authorities,
-      _rewards,
-      _rewardType,
-      _programEndsAt
+    constructor(
+        string memory _name,
+        bytes32[] memory _targetObjectives,
+        bytes32[] memory _authorities,
+        uint256[] memory _rewards,
+        RewardType _rewardType,
+        uint256 _programEndsAt,
+        bool _tiersSortingActive
     )
-    LoyaltySorting(_tiersSortingActive)
-  {}
+        LoyaltyProgram(
+            _name,
+            _targetObjectives,
+            _authorities,
+            _rewards,
+            _rewardType,
+            _programEndsAt
+        )
+        LoyaltySorting(_tiersSortingActive)
+    {}
 }

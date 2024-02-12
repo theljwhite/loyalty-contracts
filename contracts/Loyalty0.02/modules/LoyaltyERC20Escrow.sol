@@ -57,7 +57,7 @@ contract LoyaltyERC20Escrow {
     address public constant TEAM_ADDRESS =
         0xe63DC839fA2a6A418Af4B417cD45e257dD76f516;
     uint256 public PAYOUT_BUFFER = 4;
-    uint256 public MAX_DEPOSITORS = 3; 
+    uint256 public MAX_DEPOSITORS = 3;
 
     LoyaltyProgram public loyaltyProgram;
     address public loyaltyProgramAddress;
@@ -73,7 +73,7 @@ contract LoyaltyERC20Escrow {
     uint256 public escrowBalance;
     uint256 private depositStartDate;
     uint256 private depositEndDate;
-    bool private isDepositKeySet; 
+    bool private isDepositKeySet;
     bool public allFundsLocked;
 
     RewardCondition rewardCondition;
@@ -100,7 +100,7 @@ contract LoyaltyERC20Escrow {
     error DepositPeriodMustBeFinished();
     error CannotBeEmptyAmount();
     error NotEnoughTokensToUseSpecifiedAmount();
-   
+
     error IncorrectRewardCondition();
     error MustSetValidRewardCondition();
     error MustSetValidRewardGoal();
@@ -115,14 +115,14 @@ contract LoyaltyERC20Escrow {
     error InsufficientFunds();
     error MustWithdrawPositiveAmount();
     error LoyaltyProgramMustBeCompletedToWithdraw();
-    error ExceededMaxDepositors(); 
+    error ExceededMaxDepositors();
 
     constructor(
         address _loyaltyProgramAddress,
         address _creator,
         uint256 _programEndsAt,
-        address _rewardTokenAddress, 
-        address[] memory _approvedDepositors 
+        address _rewardTokenAddress,
+        address[] memory _approvedDepositors
     ) {
         loyaltyProgram = LoyaltyProgram(_loyaltyProgramAddress);
         loyaltyProgramAddress = _loyaltyProgramAddress;
@@ -133,11 +133,11 @@ contract LoyaltyERC20Escrow {
             revert ExceededMaxDepositors();
         }
 
-        for (uint256 i = 0; i < _approvedDepositors.length; i++){
-            isApprovedSender[_approvedDepositors[i]] = true; 
+        for (uint256 i = 0; i < _approvedDepositors.length; i++) {
+            isApprovedSender[_approvedDepositors[i]] = true;
         }
-        isApprovedToken[_rewardTokenAddress] = true; 
-        rewardToken = IERC20(_rewardTokenAddress); 
+        isApprovedToken[_rewardTokenAddress] = true;
+        rewardToken = IERC20(_rewardTokenAddress);
     }
 
     function escrowState() public view returns (EscrowState) {
@@ -151,13 +151,15 @@ contract LoyaltyERC20Escrow {
 
         if (
             depositStartDate <= block.timestamp &&
-            depositEndDate >= block.timestamp && isDepositKeySet
+            depositEndDate >= block.timestamp &&
+            isDepositKeySet
         ) {
             return EscrowState.DepositPeriod;
         }
         if (
             block.timestamp > depositEndDate &&
-            !areEscrowSettingsSet && isDepositKeySet
+            !areEscrowSettingsSet &&
+            isDepositKeySet
         ) {
             return EscrowState.AwaitingEscrowSettings;
         }
@@ -577,7 +579,7 @@ contract LoyaltyERC20Escrow {
         validDepositKeys[key] = true;
         depositStartDate = block.timestamp;
         depositEndDate = _depositEndDate;
-        isDepositKeySet = true; 
+        isDepositKeySet = true;
     }
 
     function emergencyFreeze(bool _isFrozen) external {
