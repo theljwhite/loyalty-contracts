@@ -12,16 +12,10 @@ import { moveTime } from "../../utils/moveTime";
 import {
   deployProgramAndSetUpUntilDepositPeriod,
   handleTestERC1155TokenTransfer,
+  type CreatorContracts,
 } from "../../utils/deployLoyaltyUtils";
 import { getERC1155UserProgress } from "../../utils/userProgressTestUtils";
 import { depositKeyBytes32 } from "../../constants/basicLoyaltyConstructorArgs";
-
-type CreatorContracts = {
-  loyaltyAddress: string;
-  escrowAddress: string;
-  loyalty: any;
-  escrow: any;
-};
 
 let accounts: SignerWithAddress[] = [];
 let creatorOne: SignerWithAddress;

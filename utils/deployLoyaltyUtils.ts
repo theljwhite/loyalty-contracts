@@ -1,7 +1,11 @@
 import hre from "hardhat";
 import { time } from "@nomicfoundation/hardhat-toolbox-viem/network-helpers";
 import * as allContractRoutes from "../constants/contractRoutes";
-import { RewardType } from "../constants/contractEnums";
+import {
+  EscrowState,
+  LoyaltyState,
+  RewardType,
+} from "../constants/contractEnums";
 import {
   programName,
   targetObjectivesBytes32,
@@ -27,6 +31,18 @@ type DeployLoyaltyReturn = {
   escrowAddress?: string;
   loyaltyContract: any;
   escrowContract?: any;
+};
+
+type ContractsStatesReturn = {
+  loyaltyStates: LoyaltyState[];
+  escrowStates: EscrowState[];
+};
+
+export type CreatorContracts = {
+  loyaltyAddress: string;
+  escrowAddress: string;
+  loyalty: any;
+  escrow: any;
 };
 
 export const deployLoyaltyProgram = async (
@@ -247,4 +263,18 @@ export const transferERC721 = async (
   const balanceOfReceiver = await collection.balanceOf(to.address);
 
   return { receiverBalance: balanceOfReceiver, senderBalance: balanceOfSender };
+};
+
+export const checkContractsState = async (
+  contracts: CreatorContracts[]
+): Promise<ContractsStatesReturn> => {
+  const loyaltyStates: LoyaltyState[] = [];
+  const escrowStates: EscrowState[] = [];
+  for (let i = 0; i < contracts.length; i++) {
+    const loyaltyState = await contracts[i].loyalty.state();
+    const escrowState = await contracts[i].escrow.escrowState();
+    loyaltyStates.push(loyaltyState);
+    escrowStates.push(escrowState);
+  }
+  return { escrowStates, loyaltyStates };
 };
