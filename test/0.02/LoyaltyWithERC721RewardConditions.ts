@@ -7,13 +7,8 @@ import {
   EscrowState,
   ERC721RewardOrder,
   ERC721RewardCondition,
-  ERC1155RewardCondition,
 } from "../../constants/contractEnums";
-import {
-  ONE_MONTH_SECONDS,
-  THREE_DAYS_MS,
-  TWO_DAYS_MS,
-} from "../../constants/timeAndDate";
+import { THREE_DAYS_MS } from "../../constants/timeAndDate";
 import { moveTime } from "../../utils/moveTime";
 import {
   deployProgramAndSetUpUntilDepositPeriod,
@@ -40,18 +35,15 @@ let creatorFour: SignerWithAddress;
 let userOne: SignerWithAddress;
 let userTwo: SignerWithAddress;
 let userThree: SignerWithAddress;
-let userFour: SignerWithAddress;
 
 const contracts: CreatorContracts[] = [];
 let loyaltyCreators: SignerWithAddress[] = [];
 
-let testCollectionDeployer: SignerWithAddress;
 let testCollection: any;
 
 describe("LoyaltyProgram", () => {
   before(async () => {
     accounts = await hre.ethers.getSigners();
-    testCollectionDeployer = accounts[0];
     creatorOne = accounts[1];
     creatorTwo = accounts[2];
     creatorThree = accounts[3];
@@ -60,7 +52,6 @@ describe("LoyaltyProgram", () => {
     userOne = accounts[10];
     userTwo = accounts[11];
     userThree = accounts[12];
-    userFour = accounts[13];
 
     loyaltyCreators = [creatorOne, creatorTwo, creatorThree, creatorFour];
 
@@ -622,4 +613,10 @@ describe("LoyaltyProgram", () => {
     );
   });
   //...to be continued (to test other rewardOrders with rewardConditions)
+  //so far, for 0.02 version, ERC721 tested:
+  //-Random rewardOrder with PointsTotal rewardCondition
+  //-Ascending rewardOrder with ObjectiveCompleted rewardCondition
+  //-Ascending rewardOrder with TierReached rewardCondition
+  //-reward orders are working for this version, as no changes to them.
+  //-and each reward condition is now working as expected for initial tests.
 });
