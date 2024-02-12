@@ -397,4 +397,246 @@ describe("LoyaltyProgram", () => {
     );
     expect(balanceTwo).deep.equal(correctBalShape, "Incorrect balance");
   });
+  it("ensures that 0.02 loyalty/ERC1155 escrow correctly processes PointsTotal rewardCondition as users complete objectives", async () => {
+    //loyalty program 3 has a PointsTotal reward condition.
+    //meaning that reaching or surpassing 5000 total points will reward.
+    //user should be rewarded 3 token id #2's.
+    const loyaltyThree = contracts[2].loyalty;
+    const escrowThree = contracts[2].escrow;
+
+    //first, complete objectives which shoyld not reward a token.
+    //complete objective indexes and 0 and 1 first.
+    //ensure no tokens were rewarded.
+    const objectiveIndexZero = 0;
+    const objectiveIndexOne = 1;
+    const objectiveIndexTwo = 2;
+    const objectiveIndexThree = 3;
+    const objectIndexFour = 4;
+
+    await loyaltyThree
+      .connect(userOne)
+      .completeUserAuthorityObjective(objectiveIndexZero);
+    await loyaltyThree
+      .connect(userOne)
+      .completeUserAuthorityObjective(objectiveIndexOne);
+
+    const {
+      points: pointsOne,
+      userObjsComplete: userCompletedObjsOne,
+      balance: balanceOne,
+    } = await getERC1155UserProgress(loyaltyThree, escrowThree, userOne);
+
+    expect(pointsOne).equal(800, "Incorrect points");
+    expect(userCompletedObjsOne).deep.equal(
+      [true, true, false, false, false],
+      "Incorrect complete objs"
+    );
+    expect(balanceOne.length).equal(
+      0,
+      "Incorrect - no tokens should be rewarded yet"
+    );
+
+    //complete objective index 3 and 4 which will bring points total to 6800.
+    //3 token id #2's should be rewarded to user now since they passed 5000 rewardGoal.
+    await loyaltyThree
+      .connect(userOne)
+      .completeUserAuthorityObjective(objectiveIndexThree);
+    await loyaltyThree
+      .connect(creatorThree)
+      .completeCreatorAuthorityObjective(objectIndexFour, userOne.address);
+
+    const {
+      points: pointsTwo,
+      userObjsComplete: userCompletedObjsTwo,
+      balance: balanceTwo,
+    } = await getERC1155UserProgress(loyaltyThree, escrowThree, userOne);
+
+    const correctBalanceShape = [
+      {
+        tokenId: 2,
+        amount: 3,
+      },
+    ];
+
+    expect(pointsTwo).equal(6800, "Incorrect points");
+    expect(userCompletedObjsTwo).deep.equal(
+      [true, true, false, true, true],
+      "Incorrect completed objs"
+    );
+    expect(balanceTwo).deep.equal(
+      correctBalanceShape,
+      "Incorrect balance - user shouldve been rewarded"
+    );
+
+    //complete additional objective to ensure tokens arent rewarded again.
+    //since PointsTotal is a one-off reward condition.
+    await loyaltyThree
+      .connect(userOne)
+      .completeUserAuthorityObjective(objectiveIndexTwo);
+
+    const { points: pointsThree, balance: balanceThree } =
+      await getERC1155UserProgress(loyaltyThree, escrowThree, userOne);
+    expect(pointsThree).equal(7800, "Incorrect points");
+    expect(balanceThree.length).equal(
+      1,
+      "No more tokens shouldve been rewarded"
+    );
+  });
+  it("ensures that 0.02 loyalty/ERC1155 escrow correctly processes EachObjective rewardCondition as users complete objectives", async () => {
+    //loyalty program 4 has EachObjective reward condition.
+    //it should reward tokens for each objective completed by users.
+    //payouts were:
+    //these token ids: [0, 1, 2, 3, 4]
+    //these amounts: [1, 1, 2, 2, 4];
+    //completing objective index 0 should reward 1 token id #0.
+    //completing objective index 1 should reward 1 token id #1.
+    //and so on....
+
+    //complete all objectives in loyalty program 4.
+    //ensure that balances are correct.
+    const loyaltyFour = contracts[3].loyalty;
+    const escrowFour = contracts[3].escrow;
+    const objectiveIndexes = [0, 1, 2, 3, 4];
+
+    //complete first 4 objectives (user authority)
+    for (let i = 0; i < objectiveIndexes.length - 1; i++) {
+      await loyaltyFour
+        .connect(userOne)
+        .completeUserAuthorityObjective(objectiveIndexes[i]);
+    }
+
+    //complete last objective (creator authority)
+    await loyaltyFour
+      .connect(creatorFour)
+      .completeCreatorAuthorityObjective(objectiveIndexes[4], userOne.address);
+
+    //ensure progression is processed and ensure correct token balance.
+    const { points, userObjsComplete, balance, currentTier } =
+      await getERC1155UserProgress(loyaltyFour, escrowFour, userOne);
+    const correctTokenBalance = [
+      {
+        tokenId: 0,
+        amount: 1,
+      },
+      { tokenId: 1, amount: 1 },
+      { tokenId: 2, amount: 2 },
+      { tokenId: 3, amount: 2 },
+      { tokenId: 4, amount: 4 },
+    ];
+
+    expect(points).equal(7800, "Incorrect points");
+    expect(currentTier).equal(4, "Incorrect tier");
+    expect(userObjsComplete).deep.equal(
+      Array(objectiveIndexes.length).fill(true),
+      "Incorrect - all objs should be completed"
+    );
+    expect(balance).deep.equal(
+      correctTokenBalance,
+      "Incorrect balances - should have been rewarded for each obj index"
+    );
+  });
+  it("ensures that 0.02 loyalty/ERC1155 escrow correctly processes EachTier rewardCondition as users complete objectives", async () => {
+    //loyalty program 5 has EachTier reward condition.
+    //it should reward tokens for each tier reached by user.
+    //it should also reward for "skipped tiers".
+    //for example, if user was in tier 1 and earned enough points to go directly to tier 4,
+    //it should still reward for tier 1, 2, 3, and 4.
+    //tier index 0 cannot be set to payout any tokens. so if not in at least tier index 1,
+    //no token should be rewarded.
+    //token ids to payout: [0, 1, 1, 3, 4]
+    //amounts of each to payout: [0, 2, 2, 3, 3]
+    //note that the zero indexes are forced to be 0's here (from setEscrowSettings)
+
+    const loyaltyFive = contracts[4].loyalty;
+    const escrowFive = contracts[4].escrow;
+
+    //first, complete objective index 0, worth 400 points.
+    //points required for tier index 1 is 400, so user should be rewarded for tier 1.
+    //they should be rewarded 2 token id #1's.
+    const objectiveIndexes = [0, 1, 2, 3, 4];
+    await loyaltyFive
+      .connect(userTwo)
+      .completeUserAuthorityObjective(objectiveIndexes[0]);
+
+    const {
+      points: pointsOne,
+      userObjsComplete: userCompletedObjsOne,
+      balance: balanceOne,
+      currentTier: currentTierOne,
+    } = await getERC1155UserProgress(loyaltyFive, escrowFive, userTwo);
+
+    const correctBalanceOne = [{ tokenId: 1, amount: 2 }];
+
+    expect(pointsOne).equal(400, "Incorrect points");
+    expect(userCompletedObjsOne).deep.equal(
+      [true, false, false, false, false],
+      "Incorrect completed objs"
+    );
+    expect(currentTierOne).equal(1, "Incorrect - user should now be in tier 1");
+    expect(balanceOne).deep.equal(
+      correctBalanceOne,
+      "Incorrect - should have 2 token id #1's"
+    );
+
+    //complete objective indexes 1, 2, and 3.
+    //this will bring points to 3800, however, tier should not changed.
+    //ensure balance is still the same.
+    for (let i = objectiveIndexes[1]; i < objectiveIndexes.length - 1; i++) {
+      await loyaltyFive
+        .connect(userTwo)
+        .completeUserAuthorityObjective(objectiveIndexes[i]);
+    }
+    const {
+      points: pointsTwo,
+      userObjsComplete: userCompletedObjsTwo,
+      balance: balanceTwo,
+      currentTier: currentTierTwo,
+    } = await getERC1155UserProgress(loyaltyFive, escrowFive, userTwo);
+
+    expect(pointsTwo).equal(3800, "Incorrect points");
+    expect(userCompletedObjsTwo).deep.equal(
+      [true, true, true, true, false],
+      "Incorrect completed objs"
+    );
+    expect(currentTierTwo).equal(
+      1,
+      "Incorrect - user should still be in tier 1, as tier 2 requires 4400 points"
+    );
+    expect(balanceTwo).deep.equal(
+      correctBalanceOne,
+      "Incorrect - balance should not have changed"
+    );
+
+    //complete the last objective, objective index 4.
+    //this should cause a "tier skip" from tier index 1 all the way to last tier, tier index 4.
+    //ensure that user was rewarded for each tier skip - 2, 3, and 4.
+    await loyaltyFive
+      .connect(creatorFive)
+      .completeCreatorAuthorityObjective(objectiveIndexes[4], userTwo.address);
+
+    const {
+      points: pointsFinal,
+      userObjsComplete: userCompletedObjsFinal,
+      balance: balanceFinal,
+      currentTier: currentTierFinal,
+    } = await getERC1155UserProgress(loyaltyFive, escrowFive, userTwo);
+
+    const correctFinalBalance = [
+      { tokenId: 1, amount: 2 },
+      { tokenId: 1, amount: 2 },
+      { tokenId: 3, amount: 3 },
+      { tokenId: 4, amount: 3 },
+    ];
+
+    expect(pointsFinal).equal(7800, "Incorrect points");
+    expect(userCompletedObjsFinal).deep.equal(
+      Array(objectiveIndexes.length).fill(true),
+      "Incorrect - all objs should be completed"
+    );
+    expect(currentTierFinal).equal(4, "Incorrect - should be in last tier");
+    expect(balanceFinal).deep.equal(
+      correctFinalBalance,
+      "Incorrect - all tiers should be rewarded for"
+    );
+  });
 });
