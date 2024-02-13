@@ -51,8 +51,6 @@ abstract contract LoyaltyProgram is LoyaltySorting {
         address creator,
         RewardType rewardType
     );
-    event LoyaltyTiersAdded(address creator, uint256 updatedAt);
-    event LoyaltyProgramModified(address creator, uint256 updatedAt);
     event LoyaltyProgramActive(address indexed sender, uint256 updatedAt);
     event OwnerAuthorityObjectiveCompleted(
         address indexed user,
@@ -65,12 +63,14 @@ abstract contract LoyaltyProgram is LoyaltySorting {
         uint256 completedAt
     );
 
+    string public constant VERSION = "0.02"; 
     address public constant TEAM_ADDRESS =
         0xe63DC839fA2a6A418Af4B417cD45e257dD76f516;
     bytes32 constant USER_AUTHORITY = "USER";
     bytes32 constant CREATOR_AUTHORITY = "CREATOR";
-    uint256 public maxObjectivesLength = 10;
-    uint256 public maxTiersLength = 8;
+    uint256 public constant MAX_OBJECTIVES_LENGTH = 10;
+    uint256 public constant MAX_TIERS_LENGTH = 8;
+
 
     string public name;
     address public creator;
@@ -78,7 +78,6 @@ abstract contract LoyaltyProgram is LoyaltySorting {
     bool public tiersAreActive;
     uint256 public tierCount;
     uint256 public totalPointsPossible;
-    uint256 public erc20Budget;
     uint256 public programEndsAt;
     RewardType public rewardType;
     bool public canceled;
@@ -95,18 +94,17 @@ abstract contract LoyaltyProgram is LoyaltySorting {
     error EmptyObjectives();
     error ConstructorArrMismatch();
     error MaxObjExceeded();
+    error MaxTierExceeded(); 
     error ProgramDurationTooShort();
-
+    
     error ObjectiveAlreadyCompleted(uint256 objectiveIndex, address user);
-    error LoyaltyProgramMustBeActive();
-    error LoyaltyProgramMustNotBeActive();
+
     error InvalidObjectiveIndex();
     error InvalidObjectiveAuthority();
-    error CannotAddObjectivesOnceProgramStarted();
+
     error OnlyCreatorCanCall();
-    error CannotAddTiersOnceProgramStarted();
     error TierRewardsMustBeInAscendingOrder();
-    error TierNamesAndRewardArraysMustBeSameLength();
+    error TierNameAndRewardMismatch();
     error OnlyCreatorOrTeamCanSetActive();
     error OnlyCreatorCanMarkOwnerObjectiveAsComplete();
     error UserCanNotBeZeroAddress();
@@ -131,6 +129,8 @@ abstract contract LoyaltyProgram is LoyaltySorting {
         ) {
             revert ConstructorArrMismatch();
         }
+        if (_targetObjectives.length > MAX_OBJECTIVES_LENGTH) revert MaxObjExceeded(); 
+        
         uint256 minimumProgramDuration = 1 days;
         if (_programEndsAt < block.timestamp + minimumProgramDuration) {
             revert ProgramDurationTooShort();
@@ -167,7 +167,7 @@ abstract contract LoyaltyProgram is LoyaltySorting {
     }
 
     function version() public pure returns (string memory) {
-        return "0.02";
+        return VERSION; 
     }
 
     function state() public view returns (LoyaltyState) {
@@ -191,7 +191,9 @@ abstract contract LoyaltyProgram is LoyaltySorting {
         uint256[] memory _tierRewardsRequired
     ) private {
         if (_tierNames.length != _tierRewardsRequired.length)
-            revert TierNamesAndRewardArraysMustBeSameLength();
+            revert TierNameAndRewardMismatch();
+
+        if (_tierNames.length > MAX_TIERS_LENGTH) revert MaxTierExceeded();
 
         if (!areTiersAscendingNoDuplicates(_tierRewardsRequired))
             revert TierRewardsMustBeInAscendingOrder();
@@ -218,7 +220,6 @@ abstract contract LoyaltyProgram is LoyaltySorting {
             tierCount += _tierRewardsRequired.length + 1;
         }
         tiersAreActive = true;
-        emit LoyaltyTiersAdded(msg.sender, block.timestamp);
     }
 
     function completeUserAuthorityObjective(uint256 _objectiveIndex) external {

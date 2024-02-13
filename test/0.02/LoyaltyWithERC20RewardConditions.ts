@@ -674,7 +674,7 @@ describe("LoyaltyProgram", () => {
     expect(currentTier).equal(4, "Incorrect tier");
     expect(userObjsComplete).deep.equal(
       [true, true, true, true, true],
-      "Incorect completed objs"
+      "Incorrect completed objs"
     );
     expect(balance).equal(correctBalance, "Incorrect balance");
   });

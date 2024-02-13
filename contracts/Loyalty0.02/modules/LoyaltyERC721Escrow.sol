@@ -75,6 +75,7 @@ contract LoyaltyERC721Escrow is IERC721Receiver, Ownable {
     event CreatoWithdraw(address creator, uint256 token, uint256 withdrawnAt);
     event FrozenStateChange(address team, bool frozen, uint256 updatedAt);
 
+    string public constant VERSION = "0.02"; 
     address public constant TEAM_ADDRESS =
         0x262dE7a263d23BeA5544b7a0BF08F2c00BFABE7b;
     uint256 public constant MAX_DEPOSITORS = 3;
@@ -108,8 +109,6 @@ contract LoyaltyERC721Escrow is IERC721Receiver, Ownable {
     mapping(address => UserAccount) userAccount;
     uint256[] private tokenQueue;
 
-    bool public isAwaitingEscrowApprovals;
-    bool public isAwaitingEscrowSettings;
     bool public areEscrowSettingsSet;
     bool public isDepositKeySet;
     bool public inIssuance;
@@ -162,7 +161,7 @@ contract LoyaltyERC721Escrow is IERC721Receiver, Ownable {
     }
 
     function version() public pure returns (string memory) {
-        return "0.02";
+        return VERSION; 
     }
 
     function escrowState() public view returns (EscrowState) {

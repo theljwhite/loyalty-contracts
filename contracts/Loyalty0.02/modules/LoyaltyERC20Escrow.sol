@@ -54,6 +54,7 @@ contract LoyaltyERC20Escrow {
     );
     event FrozenStateChange(address team, bool frozen, uint256 updatedAt);
 
+    string public constant VERSION = "0.02"; 
     address public constant TEAM_ADDRESS =
         0xe63DC839fA2a6A418Af4B417cD45e257dD76f516;
     uint256 public PAYOUT_BUFFER = 4;
@@ -69,7 +70,6 @@ contract LoyaltyERC20Escrow {
     mapping(address => bool) isApprovedToken;
     mapping(bytes32 => bool) validDepositKeys;
 
-    uint256 public budget;
     uint256 public escrowBalance;
     uint256 private depositStartDate;
     uint256 private depositEndDate;
@@ -140,6 +140,10 @@ contract LoyaltyERC20Escrow {
         rewardToken = IERC20(_rewardTokenAddress);
     }
 
+    function version() public pure returns (string memory) {
+        return VERSION; 
+    }
+
     function escrowState() public view returns (EscrowState) {
         if (
             canceled ||
@@ -189,7 +193,6 @@ contract LoyaltyERC20Escrow {
         token.safeTransferFrom(msg.sender, address(this), _amount);
 
         escrowBalance = token.balanceOf(address(this));
-        budget = token.balanceOf(address(this));
         emit ERC20Deposit(msg.sender, _token, _amount, block.timestamp);
 
         return token.balanceOf(msg.sender);
@@ -606,10 +609,4 @@ contract LoyaltyERC20Escrow {
         return escrowBalance;
     }
 
-    //TEMP
-    function getAmountByPayoutIndex(
-        uint256 _index
-    ) external view returns (uint256) {
-        return payoutIndexToAmount[_index];
-    }
 }

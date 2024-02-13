@@ -100,11 +100,13 @@ contract LoyaltyERC1155Escrow is ERC1155Holder, Ownable {
     );
     event FrozenStateChange(address team, bool frozen, uint256 updatedAt);
 
-    LoyaltyProgram public loyaltyProgram;
-    address public loyaltyProgramAddress;
+    string public constant VERSION = "0.02"; 
     address public constant TEAM_ADDRESS =
         0x262dE7a263d23BeA5544b7a0BF08F2c00BFABE7b;
     uint256 public constant MAX_DEPOSITORS = 3;
+
+    LoyaltyProgram public loyaltyProgram;
+    address public loyaltyProgramAddress;
 
     address public creator;
     uint256 public constant PAYOUT_BUFFER = 4;
@@ -149,8 +151,6 @@ contract LoyaltyERC1155Escrow is ERC1155Holder, Ownable {
     error TokenIdsAndValuesLengthMismatch();
 
     error TiersMustBeActiveToUseTiersRewardCondition();
-    error MustUseEachObjectiveOrEachTierRewardCondition();
-    error MustUseSingleObjectiveSingleTierOrPointsTotal();
 
     error PayoutCannotBeZero();
     error InsufficientBalanceForATokenId();
@@ -183,7 +183,7 @@ contract LoyaltyERC1155Escrow is ERC1155Holder, Ownable {
     }
 
     function version() public pure returns (string memory) {
-        return "0.02";
+        return VERSION; 
     }
 
     function escrowState() public view returns (EscrowState) {
@@ -741,7 +741,7 @@ contract LoyaltyERC1155Escrow is ERC1155Holder, Ownable {
             _condition != RewardCondition.SingleTier &&
             _condition != RewardCondition.PointsTotal
         ) {
-            revert MustUseSingleObjectiveSingleTierOrPointsTotal();
+            revert IncorrectRewardCondition();
         }
         if (_payout == 0) revert PayoutCannotBeZero();
         if (tokenBalances[_tokenId] < _payout * PAYOUT_BUFFER) {
@@ -762,7 +762,7 @@ contract LoyaltyERC1155Escrow is ERC1155Holder, Ownable {
             _condition != RewardCondition.EachObjective &&
             _condition != RewardCondition.EachTier
         ) {
-            revert MustUseEachObjectiveOrEachTierRewardCondition();
+            revert IncorrectRewardCondition();
         }
         if (_tokenIds.length != _payouts.length || _tokenIds.length == 0) {
             revert TokenIdsAndPayoutsLengthMismatch();
