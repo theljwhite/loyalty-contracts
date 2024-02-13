@@ -247,7 +247,9 @@ abstract contract LoyaltyProgram is LoyaltySorting {
         if (rewardType == RewardType.ERC20 && !tiersAreActive) {
             erc20EscrowContract.handleRewardsUnlock(
                 msg.sender,
-                _objectiveIndex
+                _objectiveIndex,
+                0,
+                new uint256[](0)
             );
         }
 
@@ -307,7 +309,12 @@ abstract contract LoyaltyProgram is LoyaltySorting {
         }
 
         if (rewardType == RewardType.ERC20 && !tiersAreActive) {
-            erc20EscrowContract.handleRewardsUnlock(_user, _objectiveIndex);
+            erc20EscrowContract.handleRewardsUnlock(
+                _user,
+                _objectiveIndex,
+                0,
+                new uint256[](0)
+            );
         }
 
         if (rewardType == RewardType.ERC721 && !tiersAreActive) {
@@ -368,14 +375,15 @@ abstract contract LoyaltyProgram is LoyaltySorting {
             if (rewardType == RewardType.ERC1155) {
                 erc1155EscrowContract.handleRewardsUnlock(
                     _user,
-                    _objectiveIndex, 
+                    _objectiveIndex,
                     currentTier,
                     passedTiers
                 );
             }
             if (rewardType == RewardType.ERC20) {
-                erc20EscrowContract.handleTierRewardsUnlock(
+                erc20EscrowContract.handleRewardsUnlock(
                     _user,
+                    _objectiveIndex,
                     currentTier,
                     passedTiers
                 );

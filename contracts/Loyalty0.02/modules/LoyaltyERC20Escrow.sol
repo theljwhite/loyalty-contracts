@@ -195,47 +195,44 @@ contract LoyaltyERC20Escrow {
         return token.balanceOf(msg.sender);
     }
 
-    function handleRewardsUnlock(address _user, uint256 _rewardGoal) external {
-        if (msg.sender != loyaltyProgramAddress)
-            revert OnlyLoyaltyProgramCanCall();
-        if (escrowState() != EscrowState.InIssuance) revert NotInIssuance();
-        if (
-            rewardCondition == RewardCondition.RewardPerTier ||
-            rewardCondition == RewardCondition.SingleTier ||
-            rewardCondition == RewardCondition.AllTiersComplete ||
-            rewardCondition == RewardCondition.NotSet
-        ) {
-            revert IncorrectRewardCondition();
-        }
-
-        if (
-            rewardCondition == RewardCondition.AllObjectivesComplete ||
-            rewardCondition == RewardCondition.PointsTotal
-        ) {
-            processUserProgressionRewards(_user);
-        } else if (
-            rewardCondition == RewardCondition.RewardPerObjective ||
-            rewardCondition == RewardCondition.SingleObjective
-        ) {
-            processObjectiveRewards(_user, _rewardGoal);
-        }
-    }
-
-    function handleTierRewardsUnlock(
+    function handleRewardsUnlock(
         address _user,
+        uint256 _objIndex,
         uint256 _tierIndex,
         uint256[] memory _passedTiers
     ) external {
         if (msg.sender != loyaltyProgramAddress)
             revert OnlyLoyaltyProgramCanCall();
         if (escrowState() != EscrowState.InIssuance) revert NotInIssuance();
-        if (
-            rewardCondition != RewardCondition.RewardPerTier &&
-            rewardCondition != RewardCondition.SingleTier &&
-            rewardCondition != RewardCondition.AllTiersComplete
-        ) {
+        if (rewardCondition == RewardCondition.NotSet)
             revert IncorrectRewardCondition();
+
+        if (
+            rewardCondition == RewardCondition.RewardPerTier ||
+            rewardCondition == RewardCondition.SingleTier ||
+            rewardCondition == RewardCondition.AllTiersComplete
+        ) {
+            processTierRewards(_user, _tierIndex, _passedTiers);
         }
+
+        else if (
+            rewardCondition == RewardCondition.AllObjectivesComplete ||
+            rewardCondition == RewardCondition.PointsTotal
+        ) {
+            processUserProgressionRewards(_user);
+        } else  {
+            processObjectiveRewards(_user, _objIndex);
+        }
+    }
+
+    function processTierRewards(
+        address _user,
+        uint256 _tierIndex,
+        uint256[] memory _passedTiers
+    ) private {
+        if (msg.sender != loyaltyProgramAddress)
+            revert OnlyLoyaltyProgramCanCall();
+        if (escrowState() != EscrowState.InIssuance) revert NotInIssuance();
 
         if (rewardCondition == RewardCondition.RewardPerTier) {
             for (uint256 i = 0; i < _passedTiers.length; i++) {
