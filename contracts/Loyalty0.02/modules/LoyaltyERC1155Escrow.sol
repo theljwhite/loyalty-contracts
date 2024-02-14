@@ -103,7 +103,7 @@ contract LoyaltyERC1155Escrow is ERC1155Holder, Ownable {
     string public constant VERSION = "0.02"; 
     address public constant TEAM_ADDRESS =
         0x262dE7a263d23BeA5544b7a0BF08F2c00BFABE7b;
-    uint256 public constant MAX_DEPOSITORS = 3;
+    uint256 public constant MAX_DEPOSITORS = 2;
 
     LoyaltyProgram public loyaltyProgram;
     address public loyaltyProgramAddress;
@@ -179,6 +179,7 @@ contract LoyaltyERC1155Escrow is ERC1155Holder, Ownable {
         for (uint256 i = 0; i < _approvedDepositors.length; i++) {
             isApprovedSender[_approvedDepositors[i]] = true;
         }
+        isApprovedSender[_creator] = true; 
         isCollectionLoyaltyProgramApproved[_rewardTokenAddress] = true;
     }
 

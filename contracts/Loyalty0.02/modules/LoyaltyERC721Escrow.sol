@@ -78,7 +78,7 @@ contract LoyaltyERC721Escrow is IERC721Receiver, Ownable {
     string public constant VERSION = "0.02"; 
     address public constant TEAM_ADDRESS =
         0x262dE7a263d23BeA5544b7a0BF08F2c00BFABE7b;
-    uint256 public constant MAX_DEPOSITORS = 3;
+    uint256 public constant MAX_DEPOSITORS = 2;
 
     LoyaltyProgram public loyaltyProgram;
     address public loyaltyProgramAddress;

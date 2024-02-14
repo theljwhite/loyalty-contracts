@@ -58,7 +58,7 @@ contract LoyaltyERC20Escrow {
     address public constant TEAM_ADDRESS =
         0xe63DC839fA2a6A418Af4B417cD45e257dD76f516;
     uint256 public PAYOUT_BUFFER = 4;
-    uint256 public MAX_DEPOSITORS = 3;
+    uint256 public MAX_DEPOSITORS = 2;
 
     LoyaltyProgram public loyaltyProgram;
     address public loyaltyProgramAddress;
@@ -137,6 +137,7 @@ contract LoyaltyERC20Escrow {
             isApprovedSender[_approvedDepositors[i]] = true;
         }
         isApprovedToken[_rewardTokenAddress] = true;
+        isApprovedSender[_creator] = true; 
         rewardToken = IERC20(_rewardTokenAddress);
     }
 
