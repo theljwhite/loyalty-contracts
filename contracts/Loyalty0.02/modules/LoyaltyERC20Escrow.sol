@@ -54,7 +54,7 @@ contract LoyaltyERC20Escrow {
     );
     event FrozenStateChange(address team, bool frozen, uint256 updatedAt);
 
-    string public constant VERSION = "0.02"; 
+    string public constant VERSION = "0.02";
     address public constant TEAM_ADDRESS =
         0xe63DC839fA2a6A418Af4B417cD45e257dD76f516;
     uint256 public PAYOUT_BUFFER = 4;
@@ -137,12 +137,12 @@ contract LoyaltyERC20Escrow {
             isApprovedSender[_approvedDepositors[i]] = true;
         }
         isApprovedToken[_rewardTokenAddress] = true;
-        isApprovedSender[_creator] = true; 
+        isApprovedSender[_creator] = true;
         rewardToken = IERC20(_rewardTokenAddress);
     }
 
     function version() public pure returns (string memory) {
-        return VERSION; 
+        return VERSION;
     }
 
     function escrowState() public view returns (EscrowState) {
@@ -190,7 +190,8 @@ contract LoyaltyERC20Escrow {
         if (_amount == 0) revert CannotBeEmptyAmount();
 
         IERC20 token = IERC20(_token);
-        token.safeApprove(address(this), _amount);
+
+        token.safeIncreaseAllowance(address(this), _amount);
         token.safeTransferFrom(msg.sender, address(this), _amount);
 
         escrowBalance = token.balanceOf(address(this));
@@ -217,14 +218,12 @@ contract LoyaltyERC20Escrow {
             rewardCondition == RewardCondition.AllTiersComplete
         ) {
             processTierRewards(_user, _tierIndex, _passedTiers);
-        }
-
-        else if (
+        } else if (
             rewardCondition == RewardCondition.AllObjectivesComplete ||
             rewardCondition == RewardCondition.PointsTotal
         ) {
             processUserProgressionRewards(_user);
-        } else  {
+        } else {
             processObjectiveRewards(_user, _objIndex);
         }
     }
@@ -603,11 +602,6 @@ contract LoyaltyERC20Escrow {
     }
 
     function lookupEscrowBalance() external view returns (uint256) {
-        require(
-            msg.sender == creator || msg.sender == TEAM_ADDRESS,
-            "Must be creator or team"
-        );
         return escrowBalance;
     }
-
 }

@@ -164,7 +164,6 @@ describe("LoyaltyProgram", () => {
     );
     const rewardTokenAddress = testToken.address;
     const approvedDepositors: string[] = [
-      creatorOne.address,
       depositorOne.address,
       depositorTwo.address,
     ];
