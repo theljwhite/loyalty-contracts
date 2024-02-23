@@ -7,6 +7,21 @@ import "@openzeppelin/contracts/token/ERC721/IERC721Receiver.sol";
 import "@openzeppelin/contracts/token/ERC721/extensions/IERC721Metadata.sol";
 import "@openzeppelin/contracts/token/ERC721/IERC721.sol";
 
+interface ERC721Partial {
+    function transferFrom(
+        address from,
+        address to,
+        uint256 tokenId,
+        bytes memory data
+    ) external;
+    function safeTransferFrom(
+        address from,
+        address to,
+        uint256 tokenId,
+        bytes memory data
+    ) external;
+}
+
 contract LoyaltyERC721Escrow is IERC721Receiver, Ownable {
     enum EscrowState {
         Idle,
@@ -75,7 +90,7 @@ contract LoyaltyERC721Escrow is IERC721Receiver, Ownable {
     event CreatoWithdraw(address creator, uint256 token, uint256 withdrawnAt);
     event FrozenStateChange(address team, bool frozen, uint256 updatedAt);
 
-    string public constant VERSION = "0.02"; 
+    string public constant VERSION = "0.02";
     address public constant TEAM_ADDRESS =
         0x262dE7a263d23BeA5544b7a0BF08F2c00BFABE7b;
     uint256 public constant MAX_DEPOSITORS = 2;
@@ -157,11 +172,12 @@ contract LoyaltyERC721Escrow is IERC721Receiver, Ownable {
             isApprovedSender[_approvedDepositors[i]] = true;
         }
         isApprovedSender[creator] = true;
+        isApprovedSender[address(this)] = true;
         isCollectionLoyaltyProgramApproved[_rewardTokenAddress] = true;
     }
 
     function version() public pure returns (string memory) {
-        return VERSION; 
+        return VERSION;
     }
 
     function escrowState() public view returns (EscrowState) {
@@ -259,6 +275,36 @@ contract LoyaltyERC721Escrow is IERC721Receiver, Ownable {
             tokenExists[_tokenId] = true;
             totalTokensAmount++;
             tokenIds.push(_tokenId);
+        }
+    }
+
+    function batchTransfer(
+        ERC721Partial _rewardsContract,
+        uint256[] calldata _tokenIds,
+        bytes memory _depositKey
+    ) external {
+        for (uint256 i = 0; i < _tokenIds.length; i++) {
+            _rewardsContract.transferFrom(
+                msg.sender,
+                address(this),
+                _tokenIds[i],
+                _depositKey
+            );
+        }
+    }
+
+    function safeBatchTransfer(
+        ERC721Partial _rewardsContract,
+        uint256[] calldata _tokenIds,
+        bytes memory _depositKey
+    ) external {
+        for (uint256 i = 0; i < _tokenIds.length; i++) {
+            _rewardsContract.safeTransferFrom(
+                msg.sender,
+                address(this),
+                _tokenIds[i],
+                _depositKey
+            );
         }
     }
 
