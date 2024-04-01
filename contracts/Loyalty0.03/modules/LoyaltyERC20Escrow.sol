@@ -54,7 +54,7 @@ contract LoyaltyERC20Escrow {
     );
     event FrozenStateChange(address team, bool frozen, uint256 updatedAt);
 
-    string public constant VERSION = "0.02";
+    string public constant VERSION = "0.03";
     address public constant TEAM_ADDRESS =
         0xe63DC839fA2a6A418Af4B417cD45e257dD76f516;
     uint256 public PAYOUT_BUFFER = 4;

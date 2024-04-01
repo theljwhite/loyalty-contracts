@@ -82,9 +82,7 @@ describe("ERC721 Escrow", async () => {
       );
 
     //call getEscrowTokenIds and ensure that they were added successfully from new methods
-    const escrowTokens = await erc721Escrow
-      .connect(creator)
-      .getEscrowTokenIds();
+    const escrowTokens = await erc721Escrow.connect(creator).getTokenIds();
     const escrowTokensToNum = escrowTokens.map((tkn: any) => tkn.toNumber());
 
     expect(escrowTokensToNum).deep.equal(

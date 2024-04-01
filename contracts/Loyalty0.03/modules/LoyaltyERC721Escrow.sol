@@ -90,7 +90,7 @@ contract LoyaltyERC721Escrow is IERC721Receiver, Ownable {
     event CreatoWithdraw(address creator, uint256 token, uint256 withdrawnAt);
     event FrozenStateChange(address team, bool frozen, uint256 updatedAt);
 
-    string public constant VERSION = "0.02";
+    string public constant VERSION = "0.03";
     address public constant TEAM_ADDRESS =
         0x262dE7a263d23BeA5544b7a0BF08F2c00BFABE7b;
     uint256 public constant MAX_DEPOSITORS = 2;
