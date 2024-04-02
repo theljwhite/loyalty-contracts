@@ -109,15 +109,13 @@ abstract contract LoyaltyProgram is LoyaltySorting {
     error ProgramMustBeActive();
     error ObjectiveAlreadyCompleted(uint256 objectiveIndex, address user);
 
-    error InvalidObjectiveIndex();
-    error InvalidObjectiveAuthority();
+    error InvalidObjective();
 
     error OnlyCreatorCanCall();
     error TierRewardsMustBeInAscendingOrder();
     error TierNameAndRewardMismatch();
 
     error UserCanNotBeZeroAddress();
-    error OnlyTeamCanCall();
     error OnlyUserOrRelay();
     error OnlyCreatorOrRelay();
 
@@ -252,8 +250,8 @@ abstract contract LoyaltyProgram is LoyaltySorting {
 
         Objective memory objective = objectives[_objectiveIndex];
 
-        if (objective.authority != USER_AUTHORITY) {
-            revert InvalidObjectiveAuthority();
+        if (_objectiveIndex >= objectives.length) {
+            revert InvalidObjective();
         }
 
         bool alreadyCompletedObjective = users[_user].completedObjectives[
@@ -290,8 +288,8 @@ abstract contract LoyaltyProgram is LoyaltySorting {
 
         Objective memory objective = objectives[_objectiveIndex];
 
-        if (objective.authority != CREATOR_AUTHORITY) {
-            revert InvalidObjectiveAuthority();
+        if (_objectiveIndex >= objectives.length) {
+            revert InvalidObjective();
         }
 
         bool alreadyCompletedObjective = users[_user].completedObjectives[

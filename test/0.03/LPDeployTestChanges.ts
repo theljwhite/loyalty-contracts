@@ -20,16 +20,15 @@ let relayer: SignerWithAddress;
 let userOne: SignerWithAddress;
 let userTwo: SignerWithAddress;
 let userThree: SignerWithAddress;
+let userFour: SignerWithAddress;
+let userFive: SignerWithAddress;
 
 let loyaltyOne: any;
 let escrowOne: any;
 let testToken: any;
-let testTokenDeployer: SignerWithAddress;
 
 describe("LoyaltyProgram", () => {
   before(async () => {
-    //deploy ERC20 test token to be used as rewards for escrow contracts
-
     accounts = await hre.ethers.getSigners();
     creatorOne = accounts[1];
 
@@ -38,6 +37,8 @@ describe("LoyaltyProgram", () => {
     userOne = accounts[10];
     userTwo = accounts[11];
     userThree = accounts[12];
+    userFour = accounts[13];
+    userFive = accounts[14];
 
     //deploy ERC20 test token to be used as rewards for escrow
     testToken = await hre.ethers.deployContract("AdajToken");
@@ -51,7 +52,7 @@ describe("LoyaltyProgram", () => {
     );
 
     const useTiers = true;
-    const { loyaltyAddress, escrowAddress, loyaltyContract, escrowContract } =
+    const { loyaltyContract, escrowContract } =
       await deployProgramAndSetUpUntilDepositPeriod(
         "0_03",
         RewardType.ERC20,
@@ -302,6 +303,45 @@ describe("LoyaltyProgram", () => {
     expect(finalBalance).equal(
       100,
       "Incorrect - should not have been rewarded more tokens"
+    );
+  });
+  it("ensures again that multiple different users can be given points without it affecting greatestPointsGiven and totalPointsPossible", async () => {
+    //greatest points given is 2300 from previous tests
+
+    //give a user less than 2300 points and ensure there are no changes to state
+    await loyaltyOne.connect(relayer).givePointsToUser(userThree.address, 200);
+
+    //give a user exactly 2300 to ensure there are no changes to state
+    await loyaltyOne
+      .connect(creatorOne)
+      .givePointsToUser(userFour.address, 2300);
+
+    const greatestPointsGiven = await loyaltyOne.greatestPointsGiven.call();
+    const totalPointsPossible = await loyaltyOne.totalPointsPossible.call();
+
+    expect(greatestPointsGiven.toNumber()).equal(
+      2300,
+      "Should not have changed"
+    );
+    expect(totalPointsPossible.toNumber()).equal(
+      10100,
+      "Should not have changed"
+    );
+
+    //give a user more than 2300 which should increase greatest given and total possible
+    await loyaltyOne.connect(relayer).givePointsToUser(userFive.address, 2400);
+
+    const finalGreatest = await loyaltyOne.greatestPointsGiven.call();
+    const finalTotalPointsPossible =
+      await loyaltyOne.totalPointsPossible.call();
+
+    expect(finalGreatest.toNumber()).equal(
+      2400,
+      "Incorrect, should have changed"
+    );
+    expect(finalTotalPointsPossible.toNumber()).equal(
+      10200,
+      "Incorrect, should have changed"
     );
   });
 });
