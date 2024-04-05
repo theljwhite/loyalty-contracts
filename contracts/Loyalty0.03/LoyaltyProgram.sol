@@ -58,7 +58,12 @@ abstract contract LoyaltyProgram is LoyaltySorting {
         uint256 completedAt,
         bytes32 authority
     );
-    event PointsGiven(address indexed user, uint256 amount, uint256 updatedAt);
+    event PointsUpdate(
+        address indexed user,
+        uint256 total,
+        uint256 amount,
+        uint256 updatedAt
+    );
 
     string public constant VERSION = "0.03";
     address public constant TEAM_ADDRESS =
@@ -318,10 +323,10 @@ abstract contract LoyaltyProgram is LoyaltySorting {
         if (msg.sender != creator && !isRelayer[msg.sender]) {
             revert OnlyCreatorOrRelay();
         }
+        if (_user == address(0)) revert UserCanNotBeZeroAddress();
+        if (!isActive) revert ProgramMustBeActive();
 
         if (_points == 0 || _points > totalPointsPossible) revert();
-
-        if (!isActive) revert ProgramMustBeActive();
 
         uint256 pointsGivenCopy = greatestPointsGiven;
         userToPointsGiven[_user] += _points;
@@ -335,7 +340,34 @@ abstract contract LoyaltyProgram is LoyaltySorting {
 
         handleEscrowRewards(_user, 0);
 
-        emit PointsGiven(_user, _points, block.timestamp);
+        emit PointsUpdate(
+            _user,
+            users[_user].rewardsEarned,
+            _points,
+            block.timestamp
+        );
+    }
+
+    function deductPointsFromUser(address _user, uint256 _points) external {
+        if (msg.sender != creator && !isRelayer[msg.sender]) {
+            revert OnlyCreatorOrRelay();
+        }
+        if (_user == address(0)) revert UserCanNotBeZeroAddress();
+        if (!isActive) revert ProgramMustBeActive();
+
+        if (_points == 0 || _points > users[_user].rewardsEarned) {
+            revert();
+        }
+
+        users[_user].rewardsEarned -= _points;
+
+        updateUserTierProgress(_user, 0);
+        emit PointsUpdate(
+            _user,
+            users[_user].rewardsEarned,
+            _points,
+            block.timestamp
+        );
     }
 
     function handleEscrowRewards(
@@ -372,7 +404,7 @@ abstract contract LoyaltyProgram is LoyaltySorting {
     function updateUserTierProgress(
         address _user,
         uint256 _objectiveIndex
-    ) internal {
+    ) private {
         uint256 userRewards = users[_user].rewardsEarned;
         uint256 currentTier = 0;
         uint256 passedTierCount = 0;

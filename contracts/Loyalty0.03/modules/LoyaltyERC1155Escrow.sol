@@ -156,7 +156,6 @@ contract LoyaltyERC1155Escrow is ERC1155Holder, Ownable {
     error InsufficientBalanceForATokenId();
 
     error NotInIssuance();
-    error AllRewardsPaid();
     error NoTokensToWithdraw();
     error FundsAreLocked();
 
@@ -234,26 +233,7 @@ contract LoyaltyERC1155Escrow is ERC1155Holder, Ownable {
         uint256 _value,
         bytes memory _data
     ) public virtual override returns (bytes4) {
-        require(
-            isSenderApproved(_from) && isSenderApproved(_operator),
-            "Not an approved sender"
-        );
-        require(
-            isCollectionApproved(_msgSender()),
-            "Collection not approved for this loyalty program"
-        );
-        require(_data.length >= 32, "Invalid data length");
-
-        bytes32 depositKey;
-
-        assembly {
-            depositKey := mload(add(_data, 32))
-        }
-        require(validDepositKeys[depositKey], "Invalid deposit key");
-
-        if (escrowState() != EscrowState.DepositPeriod) {
-            revert DepositsAreLocked();
-        }
+        runOnERC1155ReceivedChecks(_operator, _from, _data);
 
         uint256[] memory tokenIds = new uint256[](1);
         uint256[] memory values = new uint256[](1);
@@ -280,26 +260,8 @@ contract LoyaltyERC1155Escrow is ERC1155Holder, Ownable {
         uint256[] memory _values,
         bytes memory _data
     ) public virtual override returns (bytes4) {
-        require(
-            isSenderApproved(_from) && isSenderApproved(_operator),
-            "Not an approved sender"
-        );
-        require(
-            isCollectionApproved(_msgSender()),
-            "Collection not approved for this loyalty program"
-        );
-        require(_data.length >= 32, "Invalid data length");
+        runOnERC1155ReceivedChecks(_operator, _from, _data);
 
-        bytes32 depositKey;
-
-        assembly {
-            depositKey := mload(add(_data, 32))
-        }
-        require(validDepositKeys[depositKey], "Invalid deposit key");
-
-        if (escrowState() != EscrowState.DepositPeriod) {
-            revert DepositsAreLocked();
-        }
         parseTokensAddToEscrow(_msgSender(), _tokenIds, _values);
 
         emit ERC1155BatchReceived(
@@ -438,8 +400,6 @@ contract LoyaltyERC1155Escrow is ERC1155Holder, Ownable {
                             payout.amount,
                             block.timestamp
                         );
-                    } else {
-                        revert AllRewardsPaid();
                     }
                 }
             }
@@ -470,8 +430,6 @@ contract LoyaltyERC1155Escrow is ERC1155Holder, Ownable {
                         block.timestamp
                     );
                 }
-            } else {
-                revert AllRewardsPaid();
             }
         }
     }
@@ -502,8 +460,6 @@ contract LoyaltyERC1155Escrow is ERC1155Holder, Ownable {
                     payout.amount,
                     block.timestamp
                 );
-            } else {
-                revert AllRewardsPaid();
             }
         }
     }
@@ -648,10 +604,7 @@ contract LoyaltyERC1155Escrow is ERC1155Holder, Ownable {
         }
 
         if (_condition == RewardCondition.SingleObjective) {
-            require(
-                _rewardGoal < objectives.length,
-                "Must choose a valid objective index as reward goal"
-            );
+            require(_rewardGoal < objectives.length, "Invalid objective index");
 
             assignPayoutIndexToPayoutRewardGoal(_tokenId, _payout, _rewardGoal);
         } else if (_condition == RewardCondition.SingleTier) {
@@ -659,13 +612,13 @@ contract LoyaltyERC1155Escrow is ERC1155Holder, Ownable {
                 revert TiersMustBeActiveToUseTiersRewardCondition();
             require(
                 _rewardGoal < tierCount && _rewardGoal > 0 && tierCount > 0,
-                "Must choose a valid tier index as reward goal"
+                "Invalid tier index"
             );
             assignPayoutIndexToPayoutRewardGoal(_tokenId, _payout, _rewardGoal);
         } else if (_condition == RewardCondition.PointsTotal) {
             require(
                 _rewardGoal <= totalPointsPossible && _rewardGoal > 0,
-                "Must set a reachable points goal"
+                "Points goal unreachable"
             );
             assignPayoutIndexToPayoutRewardGoal(_tokenId, _payout, _rewardGoal);
         }
@@ -767,6 +720,30 @@ contract LoyaltyERC1155Escrow is ERC1155Holder, Ownable {
         }
         if (_tokenIds.length != _payouts.length || _tokenIds.length == 0) {
             revert TokenIdsAndPayoutsLengthMismatch();
+        }
+    }
+
+    function runOnERC1155ReceivedChecks(
+        address _operator,
+        address _from,
+        bytes memory _data
+    ) private view {
+        require(
+            isSenderApproved(_from) && isSenderApproved(_operator),
+            "Not an approved sender"
+        );
+        require(isCollectionApproved(_msgSender()), "Collection not approved");
+        require(_data.length >= 32, "Invalid data length");
+
+        bytes32 depositKey;
+
+        assembly {
+            depositKey := mload(add(_data, 32))
+        }
+        require(validDepositKeys[depositKey], "Invalid deposit key");
+
+        if (escrowState() != EscrowState.DepositPeriod) {
+            revert DepositsAreLocked();
         }
     }
 

@@ -14,7 +14,6 @@ import {
   checkContractsState,
   type CreatorContracts,
 } from "../../utils/deployLoyaltyUtils";
-import { depositKeyBytes32 } from "../../constants/basicLoyaltyConstructorArgs";
 import { getERC20UserProgress } from "../../utils/userProgressTestUtils";
 
 let accounts: SignerWithAddress[] = [];

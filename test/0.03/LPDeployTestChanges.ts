@@ -344,4 +344,111 @@ describe("LoyaltyProgram", () => {
       "Incorrect, should have changed"
     );
   });
+  it("tests if having a deductPointsFromUser function is viable and how existing processes interact with it", async () => {
+    //user 2 was given 1100 points in earlier test.
+    //ensure theyre in the correct tier based on those points.
+    const initial = await getERC20UserProgress(
+      loyaltyOne,
+      escrowOne,
+      userTwo,
+      creatorOne
+    );
+    expect(initial.currentTier).equal(1, "Incorrect tier");
+
+    //deduct 700 points and ensure user stays in same tier as 700 isnt enough,
+    //to move the user out of tier index 1.
+
+    await loyaltyOne
+      .connect(creatorOne)
+      .deductPointsFromUser(userTwo.address, 700);
+    const afterFirstDeduct = await getERC20UserProgress(
+      loyaltyOne,
+      escrowOne,
+      userTwo,
+      creatorOne
+    );
+
+    expect(afterFirstDeduct.points).equal(400, "Incorrect points");
+    expect(afterFirstDeduct.currentTier).equal(
+      1,
+      "Incorrect, tier should not have changed"
+    );
+
+    //deduct 100 more points and see if updateUserTierProgress (called in deductPoints func),
+    //handles the deduction on its own with how it is already written.
+    //deducting 100 would move points to 300 and move user to 0 index tier.
+
+    await loyaltyOne
+      .connect(relayer)
+      .deductPointsFromUser(userTwo.address, 100);
+
+    const afterSecondDeduct = await getERC20UserProgress(
+      loyaltyOne,
+      escrowOne,
+      userTwo,
+      creatorOne
+    );
+
+    expect(afterSecondDeduct.currentTier).equal(0, "Incorrect tier");
+    expect(afterSecondDeduct.points).equal(
+      300,
+      "Incorrect - deduct didnt work"
+    );
+
+    //complete objectives and give points and ensure they still process correctly
+    await loyaltyOne
+      .connect(creatorOne)
+      .completeCreatorAuthorityObjective(4, userTwo.address);
+    await loyaltyOne
+      .connect(relayer)
+      .completeUserAuthorityObjective(3, userTwo.address);
+
+    //after objectives, userTwo should now be at 300 + 4000 + 2000 points.
+    const afterObjs = await getERC20UserProgress(
+      loyaltyOne,
+      escrowOne,
+      userTwo,
+      creatorOne
+    );
+    expect(afterObjs.points).equal(6300, "Incorrect points");
+    expect(afterObjs.currentTier).equal(2, "Incorrect tier");
+
+    //give 200 points and complete an objective worth 1000.
+    //this will bring points to 7500, which should reward 100 ERC20 tokens.
+    //because the rewardGoal for rewardCondition PointsTotal was set to 7000 by creator.
+    await loyaltyOne.connect(relayer).givePointsToUser(userTwo.address, 200);
+    await loyaltyOne
+      .connect(userTwo)
+      .completeUserAuthorityObjective(2, userTwo.address);
+
+    const afterRewards = await getERC20UserProgress(
+      loyaltyOne,
+      escrowOne,
+      userTwo,
+      creatorOne
+    );
+    expect(afterRewards.points).equal(7500, "Incorrect");
+    expect(afterRewards.currentTier).equal(3, "Incorrect tier");
+    expect(afterRewards.balance).equal(
+      100,
+      "Incorrect, should have been rewarded"
+    );
+
+    //now that tokens are rewarded, deduct points from user (userTwo).
+    //ensure that tokens in escrow were unaffected,
+    //as once they are rewarded they cannot be taken back.
+    await loyaltyOne
+      .connect(relayer)
+      .deductPointsFromUser(userTwo.address, 6000);
+
+    const final = await getERC20UserProgress(
+      loyaltyOne,
+      escrowOne,
+      userTwo,
+      creatorOne
+    );
+    expect(final.balance).equal(100, "Should not have changed");
+    expect(final.points).equal(1500, "Incorrect - should have deducted 6000");
+    expect(final.currentTier).equal(1, "Incorrect tier");
+  });
 });

@@ -244,6 +244,20 @@ export const handleTestERC1155TokenTransfer = async (
   return balanceOfCreator;
 };
 
+export const handleTestERC1155TransferToEscrow = async (
+  tokenIds: number[],
+  tokenAmounts: number[],
+  testCollectionContract: any,
+  escrowAddress: string,
+  creator: SignerWithAddress
+): Promise<void> => {
+  await testCollectionContract
+    .connect(creator)
+    [
+      "safeBatchTransferFrom(address,address,uint256[],uint256[],bytes)"
+    ](creator.address, escrowAddress, tokenIds, tokenAmounts, depositKeyBytes32);
+};
+
 export const transferERC721 = async (
   tokenIdStart: number,
   tokenIdEnd: number,
@@ -277,4 +291,94 @@ export const checkContractsState = async (
     escrowStates.push(escrowState);
   }
   return { escrowStates, loyaltyStates };
+};
+
+export const estimateGasDeploy = async (
+  contractVersion: string,
+  rewardType: RewardType,
+  withTiers: boolean,
+  creator: SignerWithAddress,
+  loyaltyAddress: string,
+  rewardsAddress?: string
+): Promise<{
+  loyaltyGasEth: any;
+  escrowGasEth: any;
+} | null> => {
+  const loyaltyFactoryRoute =
+    allContractRoutes[
+      `VERSION_${contractVersion}_LOYALTY_FACTORY` as keyof typeof allContractRoutes
+    ];
+
+  const rewardTypeEnumAsString = RewardType[rewardType];
+  const loyaltyContractFactory =
+    await hre.ethers.getContractFactory(loyaltyFactoryRoute);
+
+  const threeMonthsFromNow = ONE_MONTH_SECONDS * 3;
+  const programEndsAtDate = threeMonthsFromNow + (await time.latest());
+
+  const constructorArgs = [
+    programName,
+    targetObjectivesBytes32,
+    authoritiesBytes32,
+    rewards,
+    rewardType,
+    programEndsAtDate,
+    withTiers ? true : false,
+    withTiers ? tierNamesBytes32 : [],
+    withTiers ? tierRewardsRequired : [],
+  ];
+
+  const lpDeployTx = loyaltyContractFactory.getDeployTransaction(
+    ...constructorArgs
+  );
+
+  let escrowCostEth = null;
+
+  if (rewardType !== RewardType.Points) {
+    const escrowConstructorArgs = [
+      loyaltyAddress,
+      creator.address,
+      programEndsAtDate,
+      rewardsAddress,
+      [creator.address],
+    ];
+    const escrowFactoryRoute =
+      allContractRoutes[
+        `VERSION_${contractVersion}_${rewardTypeEnumAsString}_ESCROW` as keyof typeof allContractRoutes
+      ];
+    const escrowFactory =
+      await hre.ethers.getContractFactory(escrowFactoryRoute);
+
+    const escrowDeployTx = escrowFactory.getDeployTransaction(
+      ...escrowConstructorArgs
+    );
+    const escrowPrice = await escrowFactory.signer.estimateGas(escrowDeployTx);
+    const gasPriceEscrow = await escrowFactory.signer.getGasPrice();
+    const escrowDeployPriceWei = gasPriceEscrow.mul(escrowPrice);
+    escrowCostEth = hre.ethers.utils.formatUnits(escrowDeployPriceWei, "ether");
+  }
+
+  const lpPrice = await loyaltyContractFactory.signer.estimateGas(lpDeployTx);
+  const gasPriceLp = await loyaltyContractFactory.signer.getGasPrice();
+  const lpDeployPriceWei = gasPriceLp.mul(lpPrice);
+  const lpCostEth = hre.ethers.utils.formatUnits(lpDeployPriceWei, "ether");
+
+  // const polygonRate = await getActualTokenToUSDRate("Polygon")
+  // const ethRate = await getActualTokenToUSDRate("Ethereum");
+  // const actualCostLp = (parseFloat(lpCostEth) * ethRate).toFixed(2);
+  // const actualCostEscrow = (parseFloat(escrowCostEth) * ethRate).toFixed(2);
+
+  return { loyaltyGasEth: lpCostEth, escrowGasEth: escrowCostEth };
+};
+
+const getActualTokenToUSDRate = async (tokenName: string): Promise<number> => {
+  const response = await fetch(
+    `https://api.coingecko.com/api/v3/coins/${tokenName}`
+  );
+  if (response.ok) {
+    const data = await response.json();
+    const rate = data.market_data.current_price.usd;
+    return parseInt(rate);
+  }
+  return 0;
 };
