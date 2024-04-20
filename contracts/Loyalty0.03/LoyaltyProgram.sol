@@ -529,9 +529,7 @@ abstract contract LoyaltyProgram is LoyaltySorting {
     }
 
     function setRelayer(address _relayer) external {
-        if (msg.sender != creator) {
-            revert OnlyCreatorOrRelay();
-        }
+        if (msg.sender != creator) revert OnlyCreatorCanCall();
         isRelayer[_relayer] = true;
     }
 }
