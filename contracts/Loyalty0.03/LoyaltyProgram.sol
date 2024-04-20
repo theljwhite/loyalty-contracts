@@ -95,8 +95,8 @@ abstract contract LoyaltyProgram is LoyaltySorting {
     ILoyaltyERC721Escrow erc721EscrowContract;
     ILoyaltyERC20Escrow erc20EscrowContract;
 
-    address public constant mumbaiRelay =
-        0x96986C52e59539f35064b6E47527BB23084d91EF;
+    address public constant amoyRelay =
+        0x7219173e0a99580b7A0733c788D56E6e4A8e1C16;
     address public constant sepoliaRelay =
         0x55042894942F391726f35A0FE3b5c2829320fdd3;
     address public constant testRelayDelete =
@@ -159,7 +159,7 @@ abstract contract LoyaltyProgram is LoyaltySorting {
         programEndsAt = _programEndsAt;
         rewardType = _rewardType;
 
-        isRelayer[mumbaiRelay] = true;
+        isRelayer[amoyRelay] = true;
         isRelayer[sepoliaRelay] = true;
         isRelayer[testRelayDelete] = true;
 
@@ -526,5 +526,12 @@ abstract contract LoyaltyProgram is LoyaltySorting {
 
         isActive = true;
         emit LoyaltyProgramActive(msg.sender, block.timestamp);
+    }
+
+    function setRelayer(address _relayer) external {
+        if (msg.sender != creator) {
+            revert OnlyCreatorOrRelay();
+        }
+        isRelayer[_relayer] = true;
     }
 }
