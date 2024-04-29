@@ -5,6 +5,7 @@ import "./LoyaltyProgram.sol";
 import "./extensions/LoyaltyEscrowRegistry.sol";
 import "./utils/LoyaltySorting.sol";
 
+
 contract Loyalty is LoyaltyEscrowRegistry {
     constructor(
         string memory _name,
@@ -15,7 +16,7 @@ contract Loyalty is LoyaltyEscrowRegistry {
         uint256 _programEndsAt,
         bool _tiersSortingActive,
         bytes32[] memory _tierNames,
-        uint256[] memory _tierRewardsRequired
+        uint256[] memory _tierRewardsRequired,
     )
         LoyaltyProgram(
             _name,

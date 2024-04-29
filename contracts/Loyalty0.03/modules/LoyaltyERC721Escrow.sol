@@ -77,7 +77,7 @@ contract LoyaltyERC721Escrow is IERC721Receiver, Ownable {
         RewardOrder rewardOrder,
         uint256 updatedAt
     );
-    event TokenRewarded(
+    event ERC721TokenRewarded(
         address indexed user,
         uint256 token,
         uint256 rewardedAt
@@ -365,7 +365,7 @@ contract LoyaltyERC721Escrow is IERC721Receiver, Ownable {
 
             tokenQueue.pop();
 
-            emit TokenRewarded(_user, rewardedToken, block.timestamp);
+            emit ERC721TokenRewarded(_user, rewardedToken, block.timestamp);
         } else revert TokenQueueLengthMismatch();
     }
 

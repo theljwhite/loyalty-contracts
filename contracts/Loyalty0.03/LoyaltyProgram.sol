@@ -2,11 +2,12 @@
 pragma solidity ^0.8.19;
 
 import "./utils/LoyaltySorting.sol";
+import "./utils/LoyaltySecurity.sol";
 import "./interfaces/ILoyaltyERC1155Escrow.sol";
 import "./interfaces/ILoyaltyERC721Escrow.sol";
 import "./interfaces/ILoyaltyERC20Escrow.sol";
 
-abstract contract LoyaltyProgram is LoyaltySorting {
+abstract contract LoyaltyProgram is LoyaltySorting, LoyaltySecurity {
     enum RewardType {
         Points,
         ERC20,
@@ -243,7 +244,9 @@ abstract contract LoyaltyProgram is LoyaltySorting {
 
     function completeUserAuthorityObjective(
         uint256 _objectiveIndex,
-        address _user
+        address _user,
+        bytes32 _messageHash,
+        bytes memory _signature
     ) external {
         if (msg.sender != _user && !isRelayer[msg.sender]) {
             revert OnlyUserOrRelay();
@@ -252,6 +255,10 @@ abstract contract LoyaltyProgram is LoyaltySorting {
         if (_user == address(0)) revert UserCanNotBeZeroAddress();
 
         if (!isActive) revert ProgramMustBeActive();
+
+        if (!isSignatureVerified(_messageHash, _signature, msg.sender)) {
+            revert();
+        }
 
         Objective memory objective = objectives[_objectiveIndex];
 
@@ -283,13 +290,19 @@ abstract contract LoyaltyProgram is LoyaltySorting {
 
     function completeCreatorAuthorityObjective(
         uint256 _objectiveIndex,
-        address _user
+        address _user,
+        bytes32 _messageHash,
+        bytes memory _signature
     ) external {
         if (msg.sender != creator) revert OnlyCreatorCanCall();
 
         if (_user == address(0)) revert UserCanNotBeZeroAddress();
 
         if (!isActive) revert ProgramMustBeActive();
+
+        if (!isSignatureVerified(_messageHash, _signature, msg.sender)) {
+            revert();
+        }
 
         Objective memory objective = objectives[_objectiveIndex];
 
@@ -319,7 +332,12 @@ abstract contract LoyaltyProgram is LoyaltySorting {
         );
     }
 
-    function givePointsToUser(address _user, uint256 _points) external {
+    function givePointsToUser(
+        address _user,
+        uint256 _points,
+        bytes32 _messageHash,
+        bytes memory _signature
+    ) external {
         if (msg.sender != creator && !isRelayer[msg.sender]) {
             revert OnlyCreatorOrRelay();
         }
@@ -327,6 +345,10 @@ abstract contract LoyaltyProgram is LoyaltySorting {
         if (!isActive) revert ProgramMustBeActive();
 
         if (_points == 0 || _points > totalPointsPossible) revert();
+
+        if (!isSignatureVerified(_messageHash, _signature, msg.sender)) {
+            revert();
+        }
 
         uint256 pointsGivenCopy = greatestPointsGiven;
         userToPointsGiven[_user] += _points;
@@ -348,7 +370,12 @@ abstract contract LoyaltyProgram is LoyaltySorting {
         );
     }
 
-    function deductPointsFromUser(address _user, uint256 _points) external {
+    function deductPointsFromUser(
+        address _user,
+        uint256 _points,
+        bytes32 _messageHash,
+        bytes memory _signature
+    ) external {
         if (msg.sender != creator && !isRelayer[msg.sender]) {
             revert OnlyCreatorOrRelay();
         }
@@ -356,6 +383,10 @@ abstract contract LoyaltyProgram is LoyaltySorting {
         if (!isActive) revert ProgramMustBeActive();
 
         if (_points == 0 || _points > users[_user].rewardsEarned) {
+            revert();
+        }
+
+        if (!isSignatureVerified(_messageHash, _signature, msg.sender)) {
             revert();
         }
 
