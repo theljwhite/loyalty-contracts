@@ -17,6 +17,8 @@ import {
 } from "../constants/basicLoyaltyConstructorArgs";
 import { ONE_MONTH_SECONDS, TWO_DAYS_MS } from "../constants/timeAndDate";
 import type { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers";
+import { MerkleTree } from "merkletreejs";
+import keccak256 from "keccak256";
 
 //these functions will deploy a basic loyalty program contract.
 //and also an optional escrow contract.
@@ -50,7 +52,8 @@ export const deployLoyaltyProgram = async (
   rewardType: RewardType,
   withTiers: boolean,
   creator: SignerWithAddress,
-  rewardsAddress?: string
+  rewardsAddress?: string,
+  merkleRoot?: string
 ): Promise<DeployLoyaltyReturn> => {
   const loyaltyFactoryRoute =
     allContractRoutes[
@@ -75,7 +78,8 @@ export const deployLoyaltyProgram = async (
       programEndsAtDate,
       withTiers ? tierSortingActive : false,
       withTiers ? tierNamesBytes32 : [],
-      withTiers ? tierRewardsRequired : []
+      withTiers ? tierRewardsRequired : [],
+      merkleRoot
     );
 
   if (rewardType === RewardType.Points) {
@@ -121,14 +125,16 @@ export const deployProgramAndSetUpUntilDepositPeriod = async (
   rewardType: RewardType,
   withTiers: boolean,
   creator: SignerWithAddress,
-  rewardsAddress?: string
+  rewardsAddress?: string,
+  merkleRoot?: string
 ): Promise<DeployLoyaltyReturn> => {
   const { loyaltyAddress, escrowAddress } = await deployLoyaltyProgram(
     contractVersion,
     rewardType,
     withTiers,
     creator,
-    rewardsAddress
+    rewardsAddress,
+    merkleRoot
   );
 
   const loyaltyProgramContractRoute =
@@ -299,7 +305,8 @@ export const estimateGasDeploy = async (
   withTiers: boolean,
   creator: SignerWithAddress,
   loyaltyAddress: string,
-  rewardsAddress?: string
+  rewardsAddress?: string,
+  merkleRoot?: string
 ): Promise<{
   loyaltyGasEth: any;
   escrowGasEth: any;
@@ -326,6 +333,7 @@ export const estimateGasDeploy = async (
     withTiers ? true : false,
     withTiers ? tierNamesBytes32 : [],
     withTiers ? tierRewardsRequired : [],
+    merkleRoot,
   ];
 
   const lpDeployTx = loyaltyContractFactory.getDeployTransaction(
@@ -381,4 +389,12 @@ const getActualTokenToUSDRate = async (tokenName: string): Promise<number> => {
     return parseInt(rate);
   }
   return 0;
+};
+
+export const createMerkleTree = (creatorAddress: string): string => {
+  const hashedAddressArr = [creatorAddress].map((a) => keccak256(a));
+  const merkleTree = new MerkleTree(hashedAddressArr, keccak256);
+  const merkleRoot = merkleTree.getRoot().toString("hex");
+
+  return "0x" + merkleRoot;
 };

@@ -4,7 +4,7 @@ pragma solidity ^0.8.19;
 import "./LoyaltyProgram.sol";
 import "./extensions/LoyaltyEscrowRegistry.sol";
 import "./utils/LoyaltySorting.sol";
-
+import "./utils/LoyaltySecurity.sol";
 
 contract Loyalty is LoyaltyEscrowRegistry {
     constructor(
@@ -17,6 +17,7 @@ contract Loyalty is LoyaltyEscrowRegistry {
         bool _tiersSortingActive,
         bytes32[] memory _tierNames,
         uint256[] memory _tierRewardsRequired,
+        bytes32 _merkleRoot
     )
         LoyaltyProgram(
             _name,
@@ -30,5 +31,6 @@ contract Loyalty is LoyaltyEscrowRegistry {
             _tierRewardsRequired
         )
         LoyaltySorting(_tiersSortingActive)
+        LoyaltySecurity(_merkleRoot)
     {}
 }

@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.19;
 
-import "@openzeppelin/contracts/utils/cryptography/MerkleProof.sol";
+import "./DynamicMerkleTree.sol";
 import "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 
 //TODO - experimental,
@@ -10,26 +10,40 @@ import "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 abstract contract LoyaltySecurity {
     using ECDSA for bytes32;
 
-    bytes32 public progressMerkleRoot;
+    bytes32 public merkleRoot;
+    uint256 public merkleLength;
+    mapping(address => uint256) private userToMerkleIndex;
 
-    constructor(bytes32 _progressMerkleRoot) {
-        progressMerkleRoot = _progressMerkleRoot;
+    constructor(bytes32 _merkleRoot) {
+        merkleRoot = _merkleRoot;
     }
 
-    function checkMerkleProof(
-        bytes32[] calldata _merkleProof,
-        address _addressToCheck
-    ) public view returns (bool) {
-        bytes32 leaf = keccak256(abi.encodePacked(_addressToCheck));
-        require(
-            MerkleProof.verify(_merkleProof, progressMerkleRoot, leaf),
-            "Not in merkle"
-        );
-        return true;
-    }
+    function merkleVerifyAndUpsert(
+        bytes32[] memory _proof,
+        address _user
+    ) internal {
+        uint256 userIndex = userToMerkleIndex[_user];
 
-    function updateProgressMerkleRoot(bytes32 _newMerkleRoot) external {
-        progressMerkleRoot = _newMerkleRoot;
+        if (userIndex == 0) {
+            merkleRoot = DynamicMerkleTree.append(
+                merkleLength,
+                merkleRoot,
+                keccak256(abi.encode(_user)),
+                _proof
+            );
+
+            merkleLength = merkleLength + 1;
+            userToMerkleIndex[_user] = merkleLength;
+        } else {
+            merkleRoot = DynamicMerkleTree.update(
+                userIndex - 1,
+                merkleLength,
+                merkleRoot,
+                keccak256(abi.encode(_user)),
+                keccak256(abi.encode(_user)),
+                _proof
+            );
+        }
     }
 
     function isSignatureVerified(
