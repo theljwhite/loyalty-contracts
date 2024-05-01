@@ -5,7 +5,7 @@ import "./DynamicMerkleTree.sol";
 import "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 
 //TODO - experimental,
-//all of the items below may not be implemented due to necessary dynamic nature of loyalty programs
+//all of the items below may not be implemented, this is just for testing flows.
 
 abstract contract LoyaltySecurity {
     using ECDSA for bytes32;
@@ -54,5 +54,10 @@ abstract contract LoyaltySecurity {
         bytes32 hash = ECDSA.toEthSignedMessageHash(_messageHash);
         address signer = ECDSA.recover(hash, _signature);
         return signer == _signer;
+    }
+
+    //TEMP: getter for user leaf index (may be temporary for testing)
+    function getMerkleIndex(address _user) external view returns (uint256) {
+        return userToMerkleIndex[_user];
     }
 }

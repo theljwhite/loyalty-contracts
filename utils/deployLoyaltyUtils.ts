@@ -391,10 +391,14 @@ const getActualTokenToUSDRate = async (tokenName: string): Promise<number> => {
   return 0;
 };
 
-export const createMerkleTree = (creatorAddress: string): string => {
-  const hashedAddressArr = [creatorAddress].map((a) => keccak256(a));
-  const merkleTree = new MerkleTree(hashedAddressArr, keccak256);
+export const createMerkleTree = (
+  addresses: string[]
+): { root: string; tree: MerkleTree } => {
+  const hashedAddressArr = addresses.map((a) => keccak256(a));
+  const merkleTree = new MerkleTree(hashedAddressArr, keccak256, {
+    sort: true,
+  });
   const merkleRoot = merkleTree.getRoot().toString("hex");
 
-  return "0x" + merkleRoot;
+  return { root: "0x" + merkleRoot, tree: merkleTree };
 };

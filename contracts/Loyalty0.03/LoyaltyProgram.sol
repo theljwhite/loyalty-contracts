@@ -124,6 +124,7 @@ abstract contract LoyaltyProgram is LoyaltySorting, LoyaltySecurity {
     error UserCanNotBeZeroAddress();
     error OnlyUserOrRelay();
     error OnlyCreatorOrRelay();
+    error VerificationFailed();
 
     constructor(
         string memory _name,
@@ -246,20 +247,14 @@ abstract contract LoyaltyProgram is LoyaltySorting, LoyaltySecurity {
         uint256 _objectiveIndex,
         address _user,
         bytes32[] memory _proof,
-        bytes32[] memory _messageHash,
-        bytes32 signature
+        bytes32 _messageHash,
+        bytes memory _signature
     ) external {
         if (msg.sender != _user && !isRelayer[msg.sender]) {
             revert OnlyUserOrRelay();
         }
         if (_user == address(0)) revert UserCanNotBeZeroAddress();
         if (!isActive) revert ProgramMustBeActive();
-
-        if (users[_user].objectivesCompletedCount == 0) {
-            //TODO signature needed
-        }
-
-        merkleVerifyAndUpsert(_proof, _user);
 
         Objective memory objective = objectives[_objectiveIndex];
 
@@ -274,6 +269,8 @@ abstract contract LoyaltyProgram is LoyaltySorting, LoyaltySecurity {
         if (alreadyCompletedObjective) {
             revert ObjectiveAlreadyCompleted(_objectiveIndex, _user);
         }
+
+        handleVerification(_user, _proof, _messageHash, _signature);
 
         users[_user].completedObjectives[_objectiveIndex] = true;
         users[_user].rewardsEarned += objective.reward;
@@ -292,13 +289,13 @@ abstract contract LoyaltyProgram is LoyaltySorting, LoyaltySecurity {
     function completeCreatorAuthorityObjective(
         uint256 _objectiveIndex,
         address _user,
-        bytes32[] memory _proof
+        bytes32[] memory _proof,
+        bytes32 _messageHash,
+        bytes memory _signature
     ) external {
         if (msg.sender != creator) revert OnlyCreatorCanCall();
         if (_user == address(0)) revert UserCanNotBeZeroAddress();
         if (!isActive) revert ProgramMustBeActive();
-
-        merkleVerifyAndUpsert(_proof, _user);
 
         Objective memory objective = objectives[_objectiveIndex];
 
@@ -313,6 +310,8 @@ abstract contract LoyaltyProgram is LoyaltySorting, LoyaltySecurity {
         if (alreadyCompletedObjective) {
             revert ObjectiveAlreadyCompleted(_objectiveIndex, _user);
         }
+
+        handleVerification(_user, _proof, _messageHash, _signature);
 
         users[_user].completedObjectives[_objectiveIndex] = true;
         users[_user].rewardsEarned += objective.reward;
@@ -331,7 +330,9 @@ abstract contract LoyaltyProgram is LoyaltySorting, LoyaltySecurity {
     function givePointsToUser(
         address _user,
         uint256 _points,
-        bytes32[] memory _proof
+        bytes32[] memory _proof,
+        bytes32 _messageHash,
+        bytes memory _signature
     ) external {
         if (msg.sender != creator && !isRelayer[msg.sender]) {
             revert OnlyCreatorOrRelay();
@@ -340,7 +341,7 @@ abstract contract LoyaltyProgram is LoyaltySorting, LoyaltySecurity {
         if (!isActive) revert ProgramMustBeActive();
         if (_points == 0 || _points > totalPointsPossible) revert();
 
-        merkleVerifyAndUpsert(_proof, _user);
+        handleVerification(_user, _proof, _messageHash, _signature);
 
         uint256 pointsGivenCopy = greatestPointsGiven;
         userToPointsGiven[_user] += _points;
@@ -365,7 +366,9 @@ abstract contract LoyaltyProgram is LoyaltySorting, LoyaltySecurity {
     function deductPointsFromUser(
         address _user,
         uint256 _points,
-        bytes32[] memory _proof
+        bytes32[] memory _proof,
+        bytes32 _messageHash,
+        bytes memory _signature
     ) external {
         if (msg.sender != creator && !isRelayer[msg.sender]) {
             revert OnlyCreatorOrRelay();
@@ -377,8 +380,7 @@ abstract contract LoyaltyProgram is LoyaltySorting, LoyaltySecurity {
             revert();
         }
 
-        merkleVerifyAndUpsert(_proof, _user);
-
+        handleVerification(_user, _proof, _messageHash, _signature);
         users[_user].rewardsEarned -= _points;
 
         updateUserTierProgress(_user, 0);
@@ -388,6 +390,20 @@ abstract contract LoyaltyProgram is LoyaltySorting, LoyaltySecurity {
             _points,
             block.timestamp
         );
+    }
+
+    function handleVerification(
+        address _user,
+        bytes32[] memory _proof,
+        bytes32 _messageHash,
+        bytes memory _signature
+    ) private {
+        if (users[_user].rewardsEarned == 0) {
+            if (!isSignatureVerified(_messageHash, _signature, msg.sender)) {
+                revert VerificationFailed();
+            }
+        }
+        merkleVerifyAndUpsert(_proof, _user);
     }
 
     function handleEscrowRewards(
