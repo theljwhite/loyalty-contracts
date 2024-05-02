@@ -17,6 +17,11 @@ import {
 } from "../../constants/contractEnums";
 import keccak256 from "keccak256";
 import { getERC20UserProgress } from "../../utils/userProgressTestUtils";
+import {
+  calculateRootHash,
+  getAppendProof,
+  getUpdateProof,
+} from "../../utils/merkleUtils";
 
 //tests addition of merkle tree to Loyalty, LoyaltyProgram, with LoyaltySecurity etc.
 //tests deploy with added constructor args for merkle root,
@@ -24,6 +29,8 @@ import { getERC20UserProgress } from "../../utils/userProgressTestUtils";
 
 //TODO - for this to work nodes will have to be stored off-chain sadly,
 //in order for proofs to work but for experimentation purposes I continue.
+
+//TODO 5-1/5-2 - update this with merkleUtil funcs
 
 let accounts: SignerWithAddress[] = [];
 let creatorOne: SignerWithAddress;
@@ -60,6 +67,7 @@ describe("LoyaltyProgram", () => {
     //user addresses wont be able to be used for the initial root since theyre,
     //not known at the time. but this is to help verify that merkle state var is updating,
     //for testing purposes.
+
     const { root, tree } = createMerkleTree([
       creatorOne.address,
       userOne.address,
