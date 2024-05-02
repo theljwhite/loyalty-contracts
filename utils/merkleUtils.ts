@@ -11,7 +11,6 @@ const { soliditySha256 } = hre.ethers.utils;
 const { HashZero } = hre.ethers.constants;
 
 export const calculateRootHash = (addresses: string[]): string => {
-  const { ethers } = hre;
   let nodes = addresses.map((a) => soliditySha256(["address"], [a]));
 
   if (nodes.length === 0) return HashZero;
@@ -22,10 +21,7 @@ export const calculateRootHash = (addresses: string[]): string => {
       newNodes.push(
         soliditySha256(
           ["bytes32", "bytes32"],
-          [
-            nodes[i],
-            i + 1 < nodes.length ? nodes[i + 1] : ethers.constants.HashZero,
-          ]
+          [nodes[i], i + 1 < nodes.length ? nodes[i + 1] : HashZero]
         )
       );
     }
