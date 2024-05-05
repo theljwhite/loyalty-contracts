@@ -22,11 +22,11 @@ import {
   getUpdateProof,
 } from "../../utils/merkleUtils";
 
-//tests addition of merkle tree to Loyalty, LoyaltyProgram, with LoyaltySecurity etc.
+//tests addition of "dynamic merkle tree" to Loyalty, LoyaltyProgram, with LoyaltySecurity etc.
 //tests deploy with added constructor args for merkle root,
 //also tests progression funcs with merkle verification (objectives, giving points, etc);
 
-//TODO - for this to work nodes will have to be stored off-chain sadly,
+//for this to work nodes will have to be stored off-chain sadly,
 //in order for proofs to work but for experimentation purposes I continue.
 //prob isnt that scalable though haha.
 //tests need to be ran for only requiring a signature without merkle, may b more practical
@@ -274,9 +274,70 @@ describe("LoyaltyProgram", () => {
     expect(prog.points).equal(800, "Incorrect");
   });
   it("estimates gas for completing an objective with first iteration signature verification added", async () => {
-    //TODO
+    const objectiveIndexThree = 3;
+    const timestamp = await time.latest();
+    const message = `${objectiveIndexThree}${timestamp}`;
+    const messageHash = keccak256(message);
+    const signature = await relayer.signMessage(
+      hre.ethers.utils.arrayify(messageHash)
+    );
+    const userThreeAppendProof = getAppendProof(treeAddresses);
+
+    const gasPrice = await hre.ethers.provider.getGasPrice();
+    const txWithSignature = await programOne
+      .connect(relayer)
+      .estimateGas.completeUserAuthorityObjective(
+        objectiveIndexThree,
+        userThree.address,
+        userThreeAppendProof,
+        messageHash,
+        signature
+      );
+    const cost = gasPrice.mul(txWithSignature);
+    const costInEth = parseFloat(hre.ethers.utils.formatUnits(cost, "ether"));
+
+    expect(costInEth).to.be.lessThan(0.0003);
+
+    //actually send the tx through instead of estimating gas
+    await programOne
+      .connect(relayer)
+      .completeUserAuthorityObjective(
+        objectiveIndexThree,
+        userThree.address,
+        userThreeAppendProof,
+        messageHash,
+        signature
+      );
+
+    //ensure off-chain and on-chain merkle roots match after 3rd address added
+    treeAddresses.push(userThree.address);
+    const newOffChainRoot = calculateRootHash(treeAddresses);
+    const newOnChainRoot = await programOne.merkleRoot.call();
+
+    expect(newOnChainRoot).equal(
+      newOffChainRoot,
+      "Incorrect - roots dont match"
+    );
   }),
     it("estimates gas for completing an objective with second iteration merkle proof verification added", async () => {
-      //TODO
+      //estimate gas for when a signature isnt needed but merkle proof is needed
+
+      const userThreeUpdateProof = getUpdateProof(treeAddresses, 2);
+      const gasPrice = await hre.ethers.provider.getGasPrice();
+      const txWithoutSignature = await programOne
+        .connect(relayer)
+        .estimateGas.completeUserAuthorityObjective(
+          0,
+          userThree.address,
+          userThreeUpdateProof,
+          hre.ethers.constants.HashZero,
+          "0x"
+        );
+
+      const cost = gasPrice.mul(txWithoutSignature);
+      const costInEth = hre.ethers.utils.formatUnits(cost, "ether");
+
+      expect(parseFloat(costInEth)).to.be.lessThan(0.0003);
     });
+  //...etc
 });
