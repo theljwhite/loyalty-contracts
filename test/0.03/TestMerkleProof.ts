@@ -339,5 +339,18 @@ describe("LoyaltyProgram", () => {
 
       expect(parseFloat(costInEth)).to.be.lessThan(0.0003);
     });
+  it("verifies indexing is correct in contract", async () => {
+    //ensure indexing correct in contract
+    const u1 = await programOne.getMerkleIndex(userOne.address);
+    const u2 = await programOne.getMerkleIndex(userTwo.address);
+    const u3 = await programOne.getMerkleIndex(userThree.address);
+    const userOneIndex = u1.toNumber();
+    const userTwoIndex = u2.toNumber();
+    const userThreeIndex = u3.toNumber();
+
+    expect(userOneIndex).equal(1, "Incorrect index for user 1");
+    expect(userTwoIndex).equal(2, "Incorrect index for user 2");
+    expect(userThreeIndex).equal(3, "Incorrect index for user 3");
+  });
   //...etc
 });
