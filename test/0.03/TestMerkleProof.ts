@@ -5,7 +5,6 @@ import { THREE_DAYS_MS } from "../../constants/timeAndDate";
 import { moveTime } from "../../utils/moveTime";
 import { time } from "@nomicfoundation/hardhat-toolbox-viem/network-helpers";
 import {
-  createMerkleTree,
   deployProgramAndSetUpUntilDepositPeriod,
   estimateGasDeploy,
 } from "../../utils/deployLoyaltyUtils";
@@ -29,8 +28,8 @@ import {
 
 //TODO - for this to work nodes will have to be stored off-chain sadly,
 //in order for proofs to work but for experimentation purposes I continue.
-
-//TODO 5-1/5-2 - update this with merkleUtil funcs
+//prob isnt that scalable though haha.
+//tests need to be ran for only requiring a signature without merkle, may b more practical
 
 let accounts: SignerWithAddress[] = [];
 let creatorOne: SignerWithAddress;
@@ -45,7 +44,7 @@ let programOne: any;
 let escrowOne: any;
 let testToken: any;
 
-let merkleTree: any;
+const treeAddresses: string[] = [];
 let initialMerkleRoot: string = "";
 
 describe("LoyaltyProgram", () => {
@@ -63,19 +62,7 @@ describe("LoyaltyProgram", () => {
   });
 
   it("ensures loyalty program contracts still deploys successfully after adding merkleRoot as constructor arg in Loyalty/LoyaltyProgram", async () => {
-    //create initial merkle root from creator address and user one address.
-    //user addresses wont be able to be used for the initial root since theyre,
-    //not known at the time. but this is to help verify that merkle state var is updating,
-    //for testing purposes.
-
-    const { root, tree } = createMerkleTree([
-      creatorOne.address,
-      userOne.address,
-      userTwo.address,
-    ]);
-
-    initialMerkleRoot = root;
-    merkleTree = tree;
+    initialMerkleRoot = calculateRootHash(treeAddresses);
 
     //deploy loyalty program contract with escrow contract.
     //ensure that deploy is okay with newly added constructor arg.
@@ -162,13 +149,7 @@ describe("LoyaltyProgram", () => {
   });
 
   it("tests merkle interaction, verifying addresses when calling a user progression func (complete objective, give points)", async () => {
-    //if I decide to move forward with this merkle/signature flow,
-    //i will have to figure out the best way from backend to detect when an empty array
-    //needs to be passed as proof for the first iteration
-    //(first time _user address interacts with the contract (through TX relayer or directly)
-
-    //complete objective index 0, pass in an empty bytes32[] as proof since not needed yet.
-    //but a signature will now be required for first iteration.
+    //signature required any time appending to on chain merkle
     const objectiveIndexZero = 0;
     const timestamp = await time.latest();
     const message = `${objectiveIndexZero}${timestamp}`;
@@ -177,39 +158,48 @@ describe("LoyaltyProgram", () => {
       hre.ethers.utils.arrayify(messageHash)
     );
 
+    //get proof off-chain
+    const appendProof = getAppendProof(treeAddresses);
     await programOne
       .connect(relayer)
       .completeUserAuthorityObjective(
         0,
         userOne.address,
-        [],
+        appendProof,
         messageHash,
         signature
       );
 
-    //ensure that after first iteration, merkle tree updated.
+    //ensure that after first iteration, merkle tree in contract updated.
+    const newOnChainRoot = await programOne.merkleRoot.call();
     const treeLengthOne = await programOne.merkleLength.call();
+
+    treeAddresses.push(userOne.address);
+    const newOffChainRoot = calculateRootHash(treeAddresses);
+
+    expect(newOnChainRoot).to.not.equal(
+      initialMerkleRoot,
+      "Incorrect - root didnt update"
+    );
+    expect(newOnChainRoot).equal(
+      newOffChainRoot,
+      "Incorrect - roots dont match"
+    );
     expect(treeLengthOne.toNumber()).equal(1, "Incorrect - did not update");
 
-    //root should now not match the original
-    const r1 = await programOne.merkleRoot.call();
-    expect(r1).to.not.equal(initialMerkleRoot, "Incorrect - root didnt update");
-
-    const userOneMerkleIndex = await programOne.getMerkleIndex(userOne.address);
-    expect(userOneMerkleIndex.toNumber()).equal(
-      1,
-      "Incorrect - merkle didnt append"
+    const contractMerkleIndex = await programOne.getMerkleIndex(
+      userOne.address
     );
+    const userOneMerkleIndex = contractMerkleIndex.toNumber();
+    expect(userOneMerkleIndex).equal(1, "Incorrect - merkle didnt append");
 
-    const badProof = merkleTree.getHexProof(keccak256(userThree.address));
+    const badProof = getUpdateProof([userThree.address], 0);
     expect(badProof).to.be.empty;
 
-    //on second iteration (_user has already interacted with contract),
+    //on second iteration (contract has already seen _user address),
     //proof is needed now to bypass signature verification (if i keep this flow w the merkle).
     //so complete second objective with merkle proof and no signature, ensure behavior is correct.
-    const userOneProof = merkleTree.getHexProof(
-      keccak256(userOne.address.toString())
-    );
+    const userOneProof = getUpdateProof(treeAddresses, userOneMerkleIndex);
     const objectiveIndexOne = 1;
 
     await programOne.connect(relayer).completeUserAuthorityObjective(
@@ -230,7 +220,58 @@ describe("LoyaltyProgram", () => {
     expect(balance).equal(0, "No tokens should be rewarded yet");
   });
   it("tests a different user's interactions and ensures merkle/signature functionality still processes correctly", async () => {
-    //TODO
+    //for first iteration for userTwo, signature will be required again
+    const objectiveIndexZero = 0;
+    const timestamp = await time.latest();
+    const message = `${objectiveIndexZero}${timestamp}`;
+    const messageHash = keccak256(message);
+    const signature = await relayer.signMessage(
+      hre.ethers.utils.arrayify(messageHash)
+    );
+    const userTwoProof = getAppendProof(treeAddresses);
+
+    await programOne
+      .connect(relayer)
+      .completeUserAuthorityObjective(
+        0,
+        userTwo.address,
+        userTwoProof,
+        messageHash,
+        signature
+      );
+
+    treeAddresses.push(userTwo.address);
+
+    //ensure off-chain and on-chain merkle roots match after 2nd address added
+    const newOffChainRoot = calculateRootHash(treeAddresses);
+    const newOnChainRoot = await programOne.merkleRoot.call();
+
+    expect(newOnChainRoot).equal(
+      newOffChainRoot,
+      "Incorrect - roots dont match"
+    );
+
+    //complete another objective for user 2, ensure correctness for entire flow
+    const userTwoUpdateProof = getUpdateProof(treeAddresses, 1);
+
+    await programOne
+      .connect(relayer)
+      .completeUserAuthorityObjective(
+        1,
+        userTwo.address,
+        userTwoUpdateProof,
+        hre.ethers.constants.HashZero,
+        "0x"
+      );
+
+    //ensure loyalty data updated as normal
+    const prog = await getERC20UserProgress(
+      programOne,
+      escrowOne,
+      userTwo,
+      creatorOne
+    );
+    expect(prog.points).equal(800, "Incorrect");
   });
   it("estimates gas for completing an objective with first iteration signature verification added", async () => {
     //TODO
