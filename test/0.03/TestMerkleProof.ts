@@ -296,7 +296,7 @@ describe("LoyaltyProgram", () => {
     const cost = gasPrice.mul(txWithSignature);
     const costInEth = parseFloat(hre.ethers.utils.formatUnits(cost, "ether"));
 
-    expect(costInEth).to.be.lessThan(0.0003);
+    expect(costInEth).to.be.lessThan(0.0003); //0.00025
 
     //actually send the tx through instead of estimating gas
     await programOne
@@ -337,7 +337,7 @@ describe("LoyaltyProgram", () => {
       const cost = gasPrice.mul(txWithoutSignature);
       const costInEth = hre.ethers.utils.formatUnits(cost, "ether");
 
-      expect(parseFloat(costInEth)).to.be.lessThan(0.0003);
+      expect(parseFloat(costInEth)).to.be.lessThan(0.0003); //0.00015
     });
   it("verifies indexing is correct in contract", async () => {
     //ensure indexing correct in contract
