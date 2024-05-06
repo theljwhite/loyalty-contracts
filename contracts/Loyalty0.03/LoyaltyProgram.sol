@@ -270,7 +270,7 @@ abstract contract LoyaltyProgram is LoyaltySorting, LoyaltySecurity {
             revert ObjectiveAlreadyCompleted(_objectiveIndex, _user);
         }
 
-        handleVerification(_user, _proof, _messageHash, _signature);
+        handleProgressVerification(_user, _proof, _messageHash, _signature);
 
         users[_user].completedObjectives[_objectiveIndex] = true;
         users[_user].rewardsEarned += objective.reward;
@@ -311,7 +311,7 @@ abstract contract LoyaltyProgram is LoyaltySorting, LoyaltySecurity {
             revert ObjectiveAlreadyCompleted(_objectiveIndex, _user);
         }
 
-        handleVerification(_user, _proof, _messageHash, _signature);
+        handleProgressVerification(_user, _proof, _messageHash, _signature);
 
         users[_user].completedObjectives[_objectiveIndex] = true;
         users[_user].rewardsEarned += objective.reward;
@@ -341,7 +341,7 @@ abstract contract LoyaltyProgram is LoyaltySorting, LoyaltySecurity {
         if (!isActive) revert ProgramMustBeActive();
         if (_points == 0 || _points > totalPointsPossible) revert();
 
-        handleVerification(_user, _proof, _messageHash, _signature);
+        handleProgressVerification(_user, _proof, _messageHash, _signature);
 
         uint256 pointsGivenCopy = greatestPointsGiven;
         userToPointsGiven[_user] += _points;
@@ -380,7 +380,7 @@ abstract contract LoyaltyProgram is LoyaltySorting, LoyaltySecurity {
             revert();
         }
 
-        handleVerification(_user, _proof, _messageHash, _signature);
+        handleProgressVerification(_user, _proof, _messageHash, _signature);
         users[_user].rewardsEarned -= _points;
 
         updateUserTierProgress(_user, 0);
@@ -392,7 +392,7 @@ abstract contract LoyaltyProgram is LoyaltySorting, LoyaltySecurity {
         );
     }
 
-    function handleVerification(
+    function handleProgressVerification(
         address _user,
         bytes32[] memory _proof,
         bytes32 _messageHash,
@@ -559,7 +559,6 @@ abstract contract LoyaltyProgram is LoyaltySorting, LoyaltySecurity {
         if (msg.sender != creator) {
             revert OnlyCreatorOrRelay();
         }
-
         isActive = true;
         emit LoyaltyProgramActive(msg.sender, block.timestamp);
     }
@@ -567,5 +566,27 @@ abstract contract LoyaltyProgram is LoyaltySorting, LoyaltySecurity {
     function setRelayer(address _relayer) external {
         if (msg.sender != creator) revert OnlyCreatorCanCall();
         isRelayer[_relayer] = true;
+    }
+
+    //TEMP: temporary for testing usability of a safer call here
+    function safeSetEscrowContract(
+        address _contract,
+        RewardType _rewardType,
+        bytes32 _messageHash,
+        bytes memory _signature
+    ) external {
+        if (msg.sender != creator) revert OnlyCreatorCanCall();
+
+        if (!isSignatureVerified(_messageHash, _signature, msg.sender)) {
+            revert VerificationFailed();
+        }
+
+        if (_rewardType == RewardType.ERC20) {
+            erc20EscrowContract = ILoyaltyERC20Escrow(_contract);
+        } else if (_rewardType == RewardType.ERC721) {
+            erc721EscrowContract = ILoyaltyERC721Escrow(_contract);
+        } else if (_rewardType == RewardType.ERC1155) {
+            erc1155EscrowContract = ILoyaltyERC1155Escrow(_contract);
+        }
     }
 }

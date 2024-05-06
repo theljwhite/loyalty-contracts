@@ -225,12 +225,9 @@ contract LoyaltyERC721Escrow is IERC721Receiver, Ownable {
     ) external override returns (bytes4) {
         require(
             isSenderApproved(_from) && isSenderApproved(_operator),
-            "Not an approved sender"
+            "Unapproved sender"
         );
-        require(
-            isCollectionApproved(_msgSender()),
-            "Collection not approved for this loyalty program"
-        );
+        require(isCollectionApproved(_msgSender()), "Unapproved collection");
         require(_data.length >= 32, "Invalid data length");
 
         bytes32 depositKey;
@@ -426,24 +423,21 @@ contract LoyaltyERC721Escrow is IERC721Receiver, Ownable {
         if (_rewardCondition == RewardCondition.ObjectiveCompleted) {
             require(
                 _rewardGoal > 0 && _rewardGoal < objectives.length,
-                "Goal must be set to a valid objective index"
+                "Invalid objective index"
             );
             rewardGoal = _rewardGoal;
         } else if (_rewardCondition == RewardCondition.TierReached) {
-            require(
-                tiersAreActive,
-                "Tiers must be added to use tier as reward goal"
-            );
+            require(tiersAreActive, "Tiers not active");
             require(
                 _rewardGoal > 0 && _rewardGoal < tierCount,
-                "Goal must be set to a valid tier index"
+                "Invalid tier index"
             );
             rewardGoal = _rewardGoal;
         } else {
             uint256 totalPointsPossible = loyaltyProgram.totalPointsPossible();
             require(
                 _rewardGoal > 0 && _rewardGoal <= totalPointsPossible,
-                "Must set an attainable points total"
+                "Points out of bounds"
             );
             rewardGoal = _rewardGoal;
         }
