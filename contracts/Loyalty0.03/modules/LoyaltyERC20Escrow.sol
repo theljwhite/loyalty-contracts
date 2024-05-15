@@ -145,6 +145,7 @@ contract LoyaltyERC20Escrow {
 
         rewardToken = IERC20(_rewardTokenAddress);
         rewardTokenDecimals = IERC20Metadata(_rewardTokenAddress).decimals();
+        rewardTokenAddress = _rewardTokenAddress;
     }
 
     function version() public pure returns (string memory) {
