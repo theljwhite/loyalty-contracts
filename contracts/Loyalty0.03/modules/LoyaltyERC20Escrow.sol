@@ -3,6 +3,7 @@ pragma solidity ^0.8.19;
 
 import "../LoyaltyProgram.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
 contract LoyaltyERC20Escrow {
@@ -188,14 +189,18 @@ contract LoyaltyERC20Escrow {
         if (escrowState() != EscrowState.DepositPeriod)
             revert DepostiPeriodNotActive();
         if (_amount == 0) revert CannotBeEmptyAmount();
+        IERC20Metadata tokenMetadata;
+
+        uint256 decimals = tokenMetadata.decimals();
+        uint256 amountInWei = _amount * (10 ** decimals);
 
         IERC20 token = IERC20(_token);
 
-        token.safeIncreaseAllowance(address(this), _amount);
-        token.safeTransferFrom(msg.sender, address(this), _amount);
+        token.safeIncreaseAllowance(address(this), amountInWei);
+        token.safeTransferFrom(msg.sender, address(this), amountInWei);
 
         escrowBalance = token.balanceOf(address(this));
-        emit ERC20Deposit(msg.sender, _token, _amount, block.timestamp);
+        emit ERC20Deposit(msg.sender, _token, amountInWei, block.timestamp);
 
         return token.balanceOf(msg.sender);
     }
