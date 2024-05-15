@@ -65,7 +65,10 @@ contract LoyaltyERC20Escrow {
     address public loyaltyProgramAddress;
     address public creator;
     uint256 public loyaltyProgramEndsAt;
+
     IERC20 rewardToken;
+    address public rewardTokenAddress;
+    uint256 public rewardTokenDecimals;
 
     mapping(address => bool) isApprovedSender;
     mapping(address => bool) isApprovedToken;
@@ -139,7 +142,9 @@ contract LoyaltyERC20Escrow {
         }
         isApprovedToken[_rewardTokenAddress] = true;
         isApprovedSender[_creator] = true;
+
         rewardToken = IERC20(_rewardTokenAddress);
+        rewardTokenDecimals = IERC20Metadata(_rewardTokenAddress).decimals();
     }
 
     function version() public pure returns (string memory) {
@@ -180,29 +185,27 @@ contract LoyaltyERC20Escrow {
         return EscrowState.Idle;
     }
 
-    function depositBudget(
-        uint256 _amount,
-        address _token
-    ) external returns (uint256) {
+    function depositBudget(uint256 _amount) external returns (uint256) {
         if (!isSenderApproved(msg.sender)) revert NotAnApprovedSender();
-        if (!isTokenApproved(_token)) revert NotAnApprovedToken();
+
         if (escrowState() != EscrowState.DepositPeriod)
             revert DepostiPeriodNotActive();
         if (_amount == 0) revert CannotBeEmptyAmount();
-        IERC20Metadata tokenMetadata;
 
-        uint256 decimals = tokenMetadata.decimals();
-        uint256 amountInWei = _amount * (10 ** decimals);
+        uint256 amountInWei = _amount * (10 ** rewardTokenDecimals);
 
-        IERC20 token = IERC20(_token);
+        rewardToken.safeIncreaseAllowance(address(this), amountInWei);
+        rewardToken.safeTransferFrom(msg.sender, address(this), amountInWei);
 
-        token.safeIncreaseAllowance(address(this), amountInWei);
-        token.safeTransferFrom(msg.sender, address(this), amountInWei);
+        escrowBalance = rewardToken.balanceOf(address(this));
+        emit ERC20Deposit(
+            msg.sender,
+            rewardTokenAddress,
+            amountInWei,
+            block.timestamp
+        );
 
-        escrowBalance = token.balanceOf(address(this));
-        emit ERC20Deposit(msg.sender, _token, amountInWei, block.timestamp);
-
-        return token.balanceOf(msg.sender);
+        return rewardToken.balanceOf(msg.sender);
     }
 
     function handleRewardsUnlock(
