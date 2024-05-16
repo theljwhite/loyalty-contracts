@@ -34,6 +34,7 @@ let userThree: SignerWithAddress;
 let programOne: any;
 let escrowOne: any;
 let testToken: any;
+let testTokenTwo: any;
 
 const treeAddresses: string[] = [];
 let initialMerkleRoot: string = "";
@@ -50,8 +51,18 @@ describe("LoyaltyProgram", async () => {
     userThree = accounts[12];
 
     //deploy test ERC20 token to be used for ERC20 escrow rewards
-    testToken = await hre.ethers.deployContract("AdajToken");
-    await testToken.transfer(creatorOne.address, 1_000_000);
+    //transfer amount from minter to creatorOne to deposit as rewards
+    testToken = await hre.ethers.deployContract("TestTokenTwo");
+
+    const transferAmount = hre.ethers.utils.parseUnits("0.8", "ether");
+    await testToken.transfer(creatorOne.address, transferAmount);
+
+    const creatorOneInitialBal = await testToken.balanceOf(creatorOne.address);
+    const creatorInitialBalEther = hre.ethers.utils.formatUnits(
+      creatorOneInitialBal,
+      "ether"
+    );
+    expect(creatorInitialBalEther).equal("0.8", "Incorrect starting bal");
 
     //deploy a loyalty program with ERC20Escrow contract
     initialMerkleRoot = calculateRootHash(treeAddresses);
@@ -73,12 +84,26 @@ describe("LoyaltyProgram", async () => {
   });
   it("tests new state variables added to LoyaltyERC20Escrow and ensures they were set properly with their addition to constructor", async () => {
     const rewardTokenAddress = await escrowOne.rewardTokenAddress.call();
-    const rewardTokenDecimals = await escrowOne.rewardTokenDecimals.call();
+    const testTokenDecimals = await testToken.decimals();
 
     expect(rewardTokenAddress).equal(testToken.address, "Incorrect");
-    expect(rewardTokenDecimals.toNumber()).equal(18, "Incorrect");
+    expect(testTokenDecimals).equal(18, "Incorrect");
   }),
-    it("deposits test tokens, sets escrow settings, etc so that units can be tested more", async () => {
-      //TODO
+    it("tests depositing of ERC20 tokens into escrow after changes to depositBudget", async () => {
+      const depositAmountOne = hre.ethers.utils.parseUnits("0.6", "ether");
+
+      await testToken
+        .connect(creatorOne)
+        .increaseAllowance(escrowOne.address, depositAmountOne);
+      await escrowOne.connect(creatorOne).depositBudget(depositAmountOne);
+
+      const escrowBalOne = await escrowOne.escrowBalance.call();
+      const escrowBalOneEther = hre.ethers.utils.formatUnits(
+        escrowBalOne,
+        "ether"
+      );
+      expect(escrowBalOneEther).equal("0.6", "Incorrect amount after deposit");
+
+      //...TODO unfinished
     });
 });

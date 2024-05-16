@@ -3,7 +3,6 @@ pragma solidity ^0.8.19;
 
 import "../LoyaltyProgram.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
 contract LoyaltyERC20Escrow {
@@ -68,7 +67,6 @@ contract LoyaltyERC20Escrow {
 
     IERC20 rewardToken;
     address public rewardTokenAddress;
-    uint256 public rewardTokenDecimals;
 
     mapping(address => bool) isApprovedSender;
     mapping(address => bool) isApprovedToken;
@@ -144,7 +142,6 @@ contract LoyaltyERC20Escrow {
         isApprovedSender[_creator] = true;
 
         rewardToken = IERC20(_rewardTokenAddress);
-        rewardTokenDecimals = IERC20Metadata(_rewardTokenAddress).decimals();
         rewardTokenAddress = _rewardTokenAddress;
     }
 
@@ -188,21 +185,18 @@ contract LoyaltyERC20Escrow {
 
     function depositBudget(uint256 _amount) external returns (uint256) {
         if (!isSenderApproved(msg.sender)) revert NotAnApprovedSender();
-
         if (escrowState() != EscrowState.DepositPeriod)
             revert DepostiPeriodNotActive();
         if (_amount == 0) revert CannotBeEmptyAmount();
 
-        uint256 amountInWei = _amount * (10 ** rewardTokenDecimals);
-
-        rewardToken.safeIncreaseAllowance(address(this), amountInWei);
-        rewardToken.safeTransferFrom(msg.sender, address(this), amountInWei);
+        rewardToken.safeIncreaseAllowance(address(this), _amount);
+        rewardToken.safeTransferFrom(msg.sender, address(this), _amount);
 
         escrowBalance = rewardToken.balanceOf(address(this));
         emit ERC20Deposit(
             msg.sender,
             rewardTokenAddress,
-            amountInWei,
+            _amount,
             block.timestamp
         );
 
