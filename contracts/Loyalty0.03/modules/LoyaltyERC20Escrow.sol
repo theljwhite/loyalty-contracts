@@ -92,7 +92,7 @@ contract LoyaltyERC20Escrow {
     error OnlyCreatorCanCall();
     error OnlyTeamCanCall();
     error OnlyLoyaltyProgramCanCall();
-    error NotAnApprovedSender();
+    error CannotDeposit();
     error NotAnApprovedToken();
     error NotInIssuance();
 
@@ -101,7 +101,7 @@ contract LoyaltyERC20Escrow {
     error DepostiPeriodNotActive();
     error DepositPeriodMustBeFinished();
     error CannotBeEmptyAmount();
-    error NotEnoughTokensToUseSpecifiedAmount();
+    error InsuffEscrowBal();
 
     error IncorrectRewardCondition();
     error MustSetValidRewardCondition();
@@ -116,7 +116,7 @@ contract LoyaltyERC20Escrow {
     error FundsAreLocked();
     error InsufficientFunds();
     error MustWithdrawPositiveAmount();
-    error LoyaltyProgramMustBeCompletedToWithdraw();
+    error ProgramNotCompleted();
     error ExceededMaxDepositors();
 
     constructor(
@@ -183,11 +183,22 @@ contract LoyaltyERC20Escrow {
         return EscrowState.Idle;
     }
 
-    function depositBudget(uint256 _amount) external returns (uint256) {
-        if (!isSenderApproved(msg.sender)) revert NotAnApprovedSender();
+    function depositBudget(
+        uint256 _amount,
+        bytes memory _key
+    ) external returns (uint256) {
+        if (!isSenderApproved(msg.sender)) revert CannotDeposit();
         if (escrowState() != EscrowState.DepositPeriod)
             revert DepostiPeriodNotActive();
         if (_amount == 0) revert CannotBeEmptyAmount();
+
+        bytes32 depositKey;
+
+        assembly {
+            depositKey := mload(add(_key, 32))
+        }
+
+        if (!validDepositKeys[depositKey]) revert CannotDeposit();
 
         rewardToken.safeIncreaseAllowance(address(this), _amount);
         rewardToken.safeTransferFrom(msg.sender, address(this), _amount);
@@ -393,7 +404,7 @@ contract LoyaltyERC20Escrow {
         }
 
         if (escrowBalance < _rewardAmount * PAYOUT_BUFFER)
-            revert NotEnoughTokensToUseSpecifiedAmount();
+            revert InsuffEscrowBal();
 
         if (_rewardCondition == RewardCondition.AllObjectivesComplete) {
             rewardGoal = loyaltyProgram.getObjectives().length;
@@ -482,7 +493,7 @@ contract LoyaltyERC20Escrow {
             totalPayouts += _payouts[i];
         }
         if (escrowBalance < totalPayouts * PAYOUT_BUFFER)
-            revert NotEnoughTokensToUseSpecifiedAmount();
+            revert InsuffEscrowBal();
     }
 
     function runSetEscrowSettingsChecks(
@@ -529,7 +540,7 @@ contract LoyaltyERC20Escrow {
         if (
             escrowState() != EscrowState.Completed &&
             escrowState() != EscrowState.Canceled
-        ) revert LoyaltyProgramMustBeCompletedToWithdraw();
+        ) revert ProgramNotCompleted();
 
         uint256 amount = escrowBalance;
         rewardToken.safeTransfer(msg.sender, amount);
@@ -546,7 +557,7 @@ contract LoyaltyERC20Escrow {
         if (
             escrowState() != EscrowState.Completed &&
             escrowState() != EscrowState.Canceled
-        ) revert LoyaltyProgramMustBeCompletedToWithdraw();
+        ) revert ProgramNotCompleted();
 
         rewardToken.safeTransfer(msg.sender, _amount);
         escrowBalance -= _amount;

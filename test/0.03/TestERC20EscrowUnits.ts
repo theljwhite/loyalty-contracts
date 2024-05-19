@@ -3,24 +3,18 @@ import hre from "hardhat";
 import { type SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers";
 import { THREE_DAYS_MS } from "../../constants/timeAndDate";
 import { moveTime } from "../../utils/moveTime";
-import { time } from "@nomicfoundation/hardhat-toolbox-viem/network-helpers";
-import {
-  deployProgramAndSetUpUntilDepositPeriod,
-  estimateGasDeploy,
-} from "../../utils/deployLoyaltyUtils";
+import { deployProgramAndSetUpUntilDepositPeriod } from "../../utils/deployLoyaltyUtils";
 import {
   ERC20RewardCondition,
-  EscrowState,
-  LoyaltyState,
   RewardType,
 } from "../../constants/contractEnums";
-import keccak256 from "keccak256";
 import { getERC20UserProgress } from "../../utils/userProgressTestUtils";
 import {
   calculateRootHash,
   getAppendProof,
   getUpdateProof,
 } from "../../utils/merkleUtils";
+import { depositKeyBytes32 } from "../../constants/basicLoyaltyConstructorArgs";
 
 let accounts: SignerWithAddress[] = [];
 let creatorOne: SignerWithAddress;
@@ -146,7 +140,9 @@ describe("LoyaltyProgram", async () => {
       await testToken
         .connect(creatorOne)
         .increaseAllowance(escrowOne.address, depositAmountOne);
-      await escrowOne.connect(creatorOne).depositBudget(depositAmountOne);
+      await escrowOne
+        .connect(creatorOne)
+        .depositBudget(depositAmountOne, depositKeyBytes32);
 
       const escrowBalOne = await escrowOne.escrowBalance.call();
       const escrowBalOneEther = hre.ethers.utils.formatUnits(
@@ -164,14 +160,16 @@ describe("LoyaltyProgram", async () => {
     await testTokenTwo
       .connect(creatorTwo)
       .increaseAllowance(escrowTwo.address, depositAmountTwo);
-    await escrowTwo.connect(creatorTwo).depositBudget(depositAmountTwo);
+    await escrowTwo
+      .connect(creatorTwo)
+      .depositBudget(depositAmountTwo, depositKeyBytes32);
 
     const escrowBalTwo = await escrowTwo.escrowBalance.call();
     const escrowBalTwoFormatted = hre.ethers.utils.formatUnits(escrowBalTwo, 6);
     expect(escrowBalTwoFormatted).equal("100000000.0");
   });
   it("ensures contract state balances are correct and ensures correct handling of amounts", async () => {
-    //ensure escrow balance for loyalty program 1 is correct
+    //ensure escrow balance for both programs is correct
     const escrowOneBal = await escrowOne.lookupEscrowBalance();
     const escrowTwoBal = await escrowTwo.lookupEscrowBalance();
 
@@ -192,5 +190,70 @@ describe("LoyaltyProgram", async () => {
       "100000000.0",
       "Incorrect escrow bal 2 after deposit"
     );
+  });
+  it("ensures amounts/payout amounts are handled correctly in escrow settings for a rewards contract with non-standard decimals", async () => {
+    //move time forward so deposit periods are over
+    await moveTime(THREE_DAYS_MS);
+
+    //set escrow settings for program two
+    //reward tokens for all 5 of the second program's objectives.
+    //1 token for each objective
+    const payoutAmounts = Array(5).fill(
+      hre.ethers.utils.parseUnits("1000000", 6)
+    );
+
+    await escrowTwo
+      .connect(creatorTwo)
+      .setEscrowSettingsAdvanced(
+        ERC20RewardCondition.RewardPerObjective,
+        payoutAmounts
+      );
+
+    //ensure amounts were handled correctly for each objective
+    const statePayoutAmounts = [];
+    for (let i = 0; i < 5; i++) {
+      const amount = await escrowTwo
+        .connect(creatorTwo)
+        .getPayoutAmountFromIndex(i);
+      statePayoutAmounts.push(amount);
+    }
+    const correctPayoutShape = Array(5).fill("1000000.0");
+    const formattedStatePayoutAmounts = statePayoutAmounts.map((amount) =>
+      hre.ethers.utils.formatUnits(amount, 6)
+    );
+    expect(formattedStatePayoutAmounts).deep.equal(correctPayoutShape);
+  });
+  it("ensures amounts/payout amounts are handled correctly in escrow settings for a rewards contract of standard 18 decimals w/ sending smaller values", async () => {
+    //reward tokens for all 5 of the first program's objectives.
+    //reward 0.0002 tokens for each objective
+    const payoutAmounts = Array(5).fill(
+      hre.ethers.utils.parseUnits("0.0002", "ether")
+    );
+
+    await escrowOne
+      .connect(creatorOne)
+      .setEscrowSettingsAdvanced(
+        ERC20RewardCondition.RewardPerObjective,
+        payoutAmounts
+      );
+
+    const statePayoutAmounts = [];
+
+    for (let i = 0; i < 5; i++) {
+      const amount = await escrowOne
+        .connect(creatorOne)
+        .getPayoutAmountFromIndex(i);
+      statePayoutAmounts.push(amount);
+    }
+
+    const correctPayoutShape = Array(5).fill("0.0002");
+    const formattedStatePayoutAmounts = statePayoutAmounts.map((amount) =>
+      hre.ethers.utils.formatUnits(amount, "ether")
+    );
+
+    expect(formattedStatePayoutAmounts).deep.equal(correctPayoutShape);
+  });
+  it("ensures proper user balance behavior when a rewards contract has non-stanard decimals", async () => {
+    //...TODO
   });
 });
