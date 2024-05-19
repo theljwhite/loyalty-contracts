@@ -170,4 +170,27 @@ describe("LoyaltyProgram", async () => {
     const escrowBalTwoFormatted = hre.ethers.utils.formatUnits(escrowBalTwo, 6);
     expect(escrowBalTwoFormatted).equal("100000000.0");
   });
+  it("ensures contract state balances are correct and ensures correct handling of amounts", async () => {
+    //ensure escrow balance for loyalty program 1 is correct
+    const escrowOneBal = await escrowOne.lookupEscrowBalance();
+    const escrowTwoBal = await escrowTwo.lookupEscrowBalance();
+
+    const escrowOneBalWeiToEth = hre.ethers.utils.formatUnits(
+      escrowOneBal,
+      "ether"
+    );
+    const escrowTwoBalWeiToContractDecimals = hre.ethers.utils.formatUnits(
+      escrowTwoBal,
+      6
+    );
+
+    expect(escrowOneBalWeiToEth).equal(
+      "0.6",
+      "Incorrect escrow 1 bal after deposit"
+    );
+    expect(escrowTwoBalWeiToContractDecimals).equal(
+      "100000000.0",
+      "Incorrect escrow bal 2 after deposit"
+    );
+  });
 });

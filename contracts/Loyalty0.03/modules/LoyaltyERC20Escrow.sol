@@ -607,4 +607,11 @@ contract LoyaltyERC20Escrow {
     function lookupEscrowBalance() external view returns (uint256) {
         return escrowBalance;
     }
+
+    //TEMP: temp for testing
+    function getPayoutAmountFromIndex(
+        uint256 _payoutIndex
+    ) public view returns (uint256) {
+        return payoutIndexToAmount[_payoutIndex];
+    }
 }
