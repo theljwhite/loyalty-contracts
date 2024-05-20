@@ -98,7 +98,7 @@ contract LoyaltyERC20Escrow {
 
     error DepositPeriodMustBeAtLeastOneHour();
     error DepositEndDateExceedsProgramEnd();
-    error DepostiPeriodNotActive();
+    error DepositPeriodNotActive();
     error DepositPeriodMustBeFinished();
     error CannotBeEmptyAmount();
     error InsuffEscrowBal();
@@ -189,7 +189,7 @@ contract LoyaltyERC20Escrow {
     ) external returns (uint256) {
         if (!isSenderApproved(msg.sender)) revert CannotDeposit();
         if (escrowState() != EscrowState.DepositPeriod)
-            revert DepostiPeriodNotActive();
+            revert DepositPeriodNotActive();
         if (_amount == 0) revert CannotBeEmptyAmount();
 
         bytes32 depositKey;
