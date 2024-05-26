@@ -57,11 +57,11 @@ abstract contract LoyaltyProgram is LoyaltySorting, LoyaltySecurity {
         address indexed user,
         uint256 objectiveIndex,
         uint256 completedAt,
-        bytes32 authority
+        uint256 totalPoints
     );
     event PointsUpdate(
         address indexed user,
-        uint256 total,
+        uint256 totalPoints,
         uint256 amount,
         uint256 updatedAt
     );
@@ -277,16 +277,13 @@ abstract contract LoyaltyProgram is LoyaltySorting, LoyaltySecurity {
             _user,
             _objectiveIndex,
             block.timestamp,
-            objective.authority
+            users[_user].rewardsEarned
         );
     }
 
     function completeCreatorAuthorityObjective(
         uint256 _objectiveIndex,
-        address _user,
-        bytes32[] memory _proof,
-        bytes32 _messageHash,
-        bytes memory _signature
+        address _user
     ) external {
         if (msg.sender != creator) revert OnlyCreatorCanCall();
         if (_user == address(0)) revert UserCanNotBeZeroAddress();
@@ -306,8 +303,6 @@ abstract contract LoyaltyProgram is LoyaltySorting, LoyaltySecurity {
             revert ObjectiveAlreadyCompleted(_objectiveIndex, _user);
         }
 
-        handleProgressVerification(_user, _proof, _messageHash, _signature);
-
         users[_user].completedObjectives[_objectiveIndex] = true;
         users[_user].rewardsEarned += objective.reward;
         users[_user].objectivesCompletedCount++;
@@ -318,25 +313,17 @@ abstract contract LoyaltyProgram is LoyaltySorting, LoyaltySecurity {
             _user,
             _objectiveIndex,
             block.timestamp,
-            objective.authority
+            users[_user].rewardsEarned
         );
     }
 
-    function givePointsToUser(
-        address _user,
-        uint256 _points,
-        bytes32[] memory _proof,
-        bytes32 _messageHash,
-        bytes memory _signature
-    ) external {
+    function givePointsToUser(address _user, uint256 _points) external {
         if (msg.sender != creator && !isRelayer[msg.sender]) {
             revert OnlyCreatorOrRelay();
         }
         if (_user == address(0)) revert UserCanNotBeZeroAddress();
         if (!isActive) revert ProgramMustBeActive();
         if (_points == 0 || _points > totalPointsPossible) revert();
-
-        handleProgressVerification(_user, _proof, _messageHash, _signature);
 
         uint256 pointsGivenCopy = greatestPointsGiven;
         userToPointsGiven[_user] += _points;
