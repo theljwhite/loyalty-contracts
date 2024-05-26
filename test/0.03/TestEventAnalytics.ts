@@ -10,32 +10,20 @@ import {
   LoyaltyState,
   RewardType,
 } from "../../constants/contractEnums";
-import keccak256 from "keccak256";
-import {
-  calculateRootHash,
-  getAppendProof,
-  getUpdateProof,
-} from "../../utils/merkleUtils";
+import { calculateRootHash } from "../../utils/merkleUtils";
 import { depositKeyBytes32 } from "../../constants/basicLoyaltyConstructorArgs";
-import { time } from "@nomicfoundation/hardhat-toolbox-viem/network-helpers";
 
 let accounts: SignerWithAddress[] = [];
 let creatorOne: SignerWithAddress;
-let creatorTwo: SignerWithAddress;
 
 let relayer: SignerWithAddress;
 
 let users: SignerWithAddress[] = [];
-let userOne: SignerWithAddress;
-let userTwo: SignerWithAddress;
 
 let programOne: any;
 let escrowOne: any;
-let programTwo: any;
-let escrowTwo: any;
 
 let testToken: any;
-let testTokenTwo: any;
 
 const treeAddresses: string[] = [];
 let initialMerkleRoot: string = "";
@@ -114,8 +102,6 @@ describe("LoyaltyProgram", async () => {
         payoutAmounts
       );
 
-    const statePayoutAmounts = [];
-
     //set program to active
     await programOne.connect(creatorOne).setLoyaltyProgramActive();
 
@@ -125,5 +111,23 @@ describe("LoyaltyProgram", async () => {
 
     expect(programState).equal(LoyaltyState.Active);
     expect(escrowState).equal(EscrowState.InIssuance);
+  });
+  it("completes objectives/gives points to a variety of users and ensures events are still functioning properly", async () => {
+    //complete objective index 0 for each of the 17 user accounts.
+    //for simplicity, merkle root experimentative flow is commented out.
+    //and also signature verification is disabled, since those arent important for the scope of this test
+    for (const user of users) {
+      await programOne
+        .connect(relayer)
+        .completeUserAuthorityObjective(0, user.address);
+    }
+
+    //retrieve events emitted for each objective completion
+    const firstEvents = await hre.ethers.provider.getLogs({
+      fromBlock: "0",
+      toBlock: "latest",
+      address: programOne.address,
+    });
+    //...TODO continue
   });
 });

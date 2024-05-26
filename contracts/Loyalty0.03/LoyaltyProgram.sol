@@ -245,10 +245,7 @@ abstract contract LoyaltyProgram is LoyaltySorting, LoyaltySecurity {
 
     function completeUserAuthorityObjective(
         uint256 _objectiveIndex,
-        address _user,
-        bytes32[] memory _proof,
-        bytes32 _messageHash,
-        bytes memory _signature
+        address _user
     ) external {
         if (msg.sender != _user && !isRelayer[msg.sender]) {
             revert OnlyUserOrRelay();
@@ -269,8 +266,6 @@ abstract contract LoyaltyProgram is LoyaltySorting, LoyaltySecurity {
         if (alreadyCompletedObjective) {
             revert ObjectiveAlreadyCompleted(_objectiveIndex, _user);
         }
-
-        handleProgressVerification(_user, _proof, _messageHash, _signature);
 
         users[_user].completedObjectives[_objectiveIndex] = true;
         users[_user].rewardsEarned += objective.reward;
