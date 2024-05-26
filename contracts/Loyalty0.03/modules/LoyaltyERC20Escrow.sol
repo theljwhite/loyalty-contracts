@@ -93,7 +93,6 @@ contract LoyaltyERC20Escrow {
     error OnlyTeamCanCall();
     error OnlyLoyaltyProgramCanCall();
     error CannotDeposit();
-    error NotAnApprovedToken();
     error NotInIssuance();
 
     error DepositPeriodMustBeAtLeastOneHour();
