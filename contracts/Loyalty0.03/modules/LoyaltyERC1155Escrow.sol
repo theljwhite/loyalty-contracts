@@ -362,6 +362,12 @@ contract LoyaltyERC1155Escrow is ERC1155Holder, Ownable {
                     })
                 );
                 tokenBalances[payout.tokenId] -= payout.amount;
+                emit ERC1155Rewarded(
+                    _user,
+                    payout.tokenId,
+                    payout.amount,
+                    block.timestamp
+                );
             }
         }
     }

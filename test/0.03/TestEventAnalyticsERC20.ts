@@ -1,7 +1,11 @@
 import { expect } from "chai";
 import hre from "hardhat";
 import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers";
-import { THREE_DAYS_MS } from "../../constants/timeAndDate";
+import {
+  ONE_MONTH_MS,
+  ONE_MONTH_SECONDS,
+  THREE_DAYS_MS,
+} from "../../constants/timeAndDate";
 import { moveTime } from "../../utils/moveTime";
 import { deployProgramAndSetUpUntilDepositPeriod } from "../../utils/deployLoyaltyUtils";
 import {
@@ -13,6 +17,7 @@ import {
 import { calculateRootHash } from "../../utils/merkleUtils";
 import { depositKeyBytes32 } from "../../constants/basicLoyaltyConstructorArgs";
 import { getAllContractLogsForEvent } from "../../utils/eventsUtils";
+import { time } from "@nomicfoundation/hardhat-toolbox-viem/network-helpers";
 
 let accounts: SignerWithAddress[] = [];
 let creatorOne: SignerWithAddress;
@@ -223,5 +228,177 @@ describe("LoyaltyProgram", async () => {
     expect(objInteractions["2"]).equal(15);
     expect(objInteractions["3"]).equal(15);
     expect(objInteractions["4"]).equal(10);
+  });
+  it("explores basic analytics for rewards distribution just based off of emitted events", async () => {
+    const erc20RewardedEvents = await getAllContractLogsForEvent(
+      escrowOne,
+      "ERC20Rewarded"
+    );
+
+    //total unique addresses who were rewarded a token
+    const erc20EventsAddresses = erc20RewardedEvents.map(
+      (event) => event.args[0]
+    );
+    const uniqueERC20EventAddresses = new Set(erc20EventsAddresses);
+
+    expect(uniqueERC20EventAddresses.size).equal(users.length);
+
+    //get total tokens rewarded in escrow just from emitted events..
+    //70 objectives complete should yield 0.014 total tokens rewarded across users
+    const totalRewardsAmount: number = erc20RewardedEvents
+      .map((event) => Number(event.args[1]))
+      .reduce((prev, curr) => prev + curr, 0);
+
+    const totalRewardsAmountInEth = hre.ethers.utils.formatUnits(
+      String(totalRewardsAmount),
+      "ether"
+    );
+
+    expect(totalRewardsAmountInEth).equal(
+      "0.014",
+      "Incorrect total tokens rewarded"
+    );
+
+    //get all reward events for a particular user
+    //reward condition is each objective, and user1 completed 4 objs.
+    //so should have 4 ERC20Rewarded events
+    const userOneEvents = erc20RewardedEvents.filter(
+      (event) => event.args[0] === users[0].address
+    );
+    const userOneRewardsAmount: number = userOneEvents
+      .map((event) => Number(event.args[1]))
+      .reduce((prev, curr) => prev + curr, 0);
+
+    const userOneRewardsAmountInEth = hre.ethers.utils.formatUnits(
+      String(userOneRewardsAmount),
+      "ether"
+    );
+
+    expect(userOneEvents[0].args[0]).equal(users[0].address);
+    expect(userOneEvents.length).equal(4, "Incorrect user one events length");
+    expect(userOneRewardsAmountInEth).equal(
+      "0.0008",
+      "Incorrect amounts retrieved by events"
+    );
+
+    //withdraw all rewarded tokens for each of the first five users
+    //all users have earned 0.0008 tokens.
+    const firstFiveUsers = users.slice(0, 5);
+
+    for (const user of firstFiveUsers) {
+      await escrowOne.connect(user).userWithdrawAll();
+    }
+
+    const withdrawEvents = await getAllContractLogsForEvent(
+      escrowOne,
+      "ERC20UserWithdraw"
+    );
+
+    expect(withdrawEvents.length).equal(5, "Incorrect - 5 users withdrew");
+
+    //get total amount withdrawn,  total rewarded tkns still in escrow.
+    //also tokens that were rewarded but not yet withdrawn.
+    //...strictly from events ofc, and then compare to actual escrow balance state.
+    //5 users withdrew 0.008 tokens which should be 0.004 total.
+    const totalAmountWithdrawn = withdrawEvents
+      .map((event) => Number(event.args[1]))
+      .reduce((prev, curr) => prev + curr, 0);
+
+    const totalAmountWithdrawnInEth = hre.ethers.utils.formatUnits(
+      String(totalAmountWithdrawn),
+      "ether"
+    );
+
+    expect(totalAmountWithdrawnInEth).equal(
+      "0.004",
+      "Incorrect total amount withdrawn"
+    );
+
+    const unclaimedRewardedTokens = totalRewardsAmount - totalAmountWithdrawn;
+    const unclaimedRewardedTokensInEth = hre.ethers.utils.formatUnits(
+      String(unclaimedRewardedTokens),
+      "ether"
+    );
+
+    expect(unclaimedRewardedTokensInEth).equal(
+      "0.01",
+      "Incorrect bal retrieved by events"
+    );
+
+    const inEscrowAmountContract = await escrowOne.lookupEscrowBalance();
+    const escrowBalContractInEth = hre.ethers.utils.formatUnits(
+      String(inEscrowAmountContract),
+      "ether"
+    );
+    expect(escrowBalContractInEth).equal(
+      "0.586",
+      "Incorrect escrow contract bal"
+    );
+  });
+  it("tests other analytics based on emitted events", async () => {
+    //move time forward 1 month & withdraw more rewarded tokens as different users
+    await moveTime(ONE_MONTH_MS);
+
+    const nextFiveUsers = users.slice(5, 10);
+
+    for (const user of nextFiveUsers) {
+      await escrowOne.connect(user).userWithdrawAll();
+    }
+
+    const withdrawEvents = await getAllContractLogsForEvent(
+      escrowOne,
+      "ERC20UserWithdraw"
+    );
+
+    expect(withdrawEvents.length).equal(10, "Incorrect withdraw events length");
+
+    //shabbily calculate time between last reward and first withdraw by user
+    //this prob wont have to be done with events stored in a db,
+    //but is still nice to experiment. (i'm on generator power with no internet)
+    //also prob doesnt need this much iteration, but oh well.
+    const allRewardEvents = await getAllContractLogsForEvent(
+      escrowOne,
+      "ERC20Rewarded"
+    );
+
+    const latestRewardEventPerUser = allRewardEvents.reduce((prev, curr) => {
+      const user = curr.args[0];
+      const rewardedAt = curr.args[2].toNumber();
+      if (!prev[user]) prev[user] = rewardedAt;
+      if (rewardedAt > prev[user]) prev[user] = rewardedAt;
+      return prev;
+    }, {});
+
+    const firstWithdrawEventPerUser = withdrawEvents.reduce((prev, curr) => {
+      const user = curr.args[0];
+      const withdrawnAt = curr.args[2].toNumber();
+      if (!prev[user]) prev[user] = withdrawnAt;
+      if (withdrawnAt < prev[user]) prev[user] = withdrawnAt;
+      return prev;
+    }, {});
+
+    //filter out users who havent withdrawn
+    const userEventTimestamps = Object.keys(latestRewardEventPerUser)
+      .map((key) => ({
+        user: key,
+        rewardTimestamp: latestRewardEventPerUser[key],
+        withdrawTimestamp: firstWithdrawEventPerUser[key],
+      }))
+      .filter((item) => item.withdrawTimestamp);
+
+    const userElapsedTimes = userEventTimestamps.map((item) => ({
+      user: item.user,
+      elapsedTimeMs: item.withdrawTimestamp - item.rewardTimestamp,
+    }));
+
+    const totalElapsedTimeMs =
+      userElapsedTimes.reduce((prev, curr) => prev + curr.elapsedTimeMs, 0) /
+      userElapsedTimes.length;
+
+    const avgElapsedTimeMin = Math.floor(totalElapsedTimeMs / 60_000);
+
+    //5 users withdrew right away (within 50ms of being rewarded LOL)
+    //and then 5 users withdrew after 30+ days, so the average is about 19 min
+    expect(avgElapsedTimeMin).equal(19, "Incorrect - should average out to 19");
   });
 });

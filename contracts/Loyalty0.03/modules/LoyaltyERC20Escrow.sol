@@ -35,12 +35,7 @@ contract LoyaltyERC20Escrow {
         uint256 amount,
         uint256 depositedAt
     );
-    event ERC20Rewarded(
-        address user,
-        uint256 amount,
-        RewardCondition rewardCondition,
-        uint256 rewardedAt
-    );
+    event ERC20Rewarded(address user, uint256 amount, uint256 rewardedAt);
     event ERC20UserWithdraw(address user, uint256 amount, uint256 withdrawnAt);
     event ERC20CreatorWithdraw(
         address creator,
@@ -263,12 +258,7 @@ contract LoyaltyERC20Escrow {
                     rewardGoalRewarded[_user][tierIndex] = true;
                     userBalance[_user] += amount;
                     escrowBalance -= amount;
-                    emit ERC20Rewarded(
-                        _user,
-                        amount,
-                        RewardCondition.RewardPerTier,
-                        block.timestamp
-                    );
+                    emit ERC20Rewarded(_user, amount, block.timestamp);
                 }
             }
         } else if (rewardCondition == RewardCondition.SingleTier) {
@@ -281,12 +271,7 @@ contract LoyaltyERC20Escrow {
                 rewardGoalRewarded[_user][rewardGoal] = true;
                 userBalance[_user] += payoutAmount;
                 escrowBalance -= payoutAmount;
-                emit ERC20Rewarded(
-                    _user,
-                    payoutAmount,
-                    RewardCondition.SingleTier,
-                    block.timestamp
-                );
+                emit ERC20Rewarded(_user, payoutAmount, block.timestamp);
             }
         } else {
             bool tierAlreadyRewarded = rewardGoalRewarded[_user][rewardGoal];
@@ -298,12 +283,7 @@ contract LoyaltyERC20Escrow {
                 rewardGoalRewarded[_user][rewardGoal] = true;
                 userBalance[_user] += payoutAmount;
                 escrowBalance -= payoutAmount;
-                emit ERC20Rewarded(
-                    _user,
-                    payoutAmount,
-                    RewardCondition.AllTiersComplete,
-                    block.timestamp
-                );
+                emit ERC20Rewarded(_user, payoutAmount, block.timestamp);
             }
         }
     }
@@ -322,12 +302,7 @@ contract LoyaltyERC20Escrow {
                 rewardGoalRewarded[_user][rewardGoal] = true;
                 userBalance[_user] += payoutAmount;
                 escrowBalance -= payoutAmount;
-                emit ERC20Rewarded(
-                    _user,
-                    payoutAmount,
-                    RewardCondition.AllObjectivesComplete,
-                    block.timestamp
-                );
+                emit ERC20Rewarded(_user, payoutAmount, block.timestamp);
             }
         } else if (rewardCondition == RewardCondition.PointsTotal) {
             (uint256 rewardsEarned, ) = loyaltyProgram.getUserProgression(
@@ -341,12 +316,7 @@ contract LoyaltyERC20Escrow {
                 rewardGoalRewarded[_user][rewardGoal] = true;
                 userBalance[_user] += payoutAmount;
                 escrowBalance -= payoutAmount;
-                emit ERC20Rewarded(
-                    _user,
-                    payoutAmount,
-                    RewardCondition.PointsTotal,
-                    block.timestamp
-                );
+                emit ERC20Rewarded(_user, payoutAmount, block.timestamp);
             }
         }
     }
@@ -359,12 +329,7 @@ contract LoyaltyERC20Escrow {
                 rewardGoalRewarded[_user][_objIndex] = true;
                 userBalance[_user] += amount;
                 escrowBalance -= amount;
-                emit ERC20Rewarded(
-                    _user,
-                    amount,
-                    RewardCondition.RewardPerObjective,
-                    block.timestamp
-                );
+                emit ERC20Rewarded(_user, amount, block.timestamp);
             }
         } else if (rewardCondition == RewardCondition.SingleObjective) {
             bool alreadyRewarded = rewardGoalRewarded[_user][rewardGoal];
@@ -376,12 +341,7 @@ contract LoyaltyERC20Escrow {
                 rewardGoalRewarded[_user][_objIndex] = true;
                 userBalance[_user] += payoutAmount;
                 escrowBalance -= payoutAmount;
-                emit ERC20Rewarded(
-                    _user,
-                    payoutAmount,
-                    RewardCondition.SingleObjective,
-                    block.timestamp
-                );
+                emit ERC20Rewarded(_user, payoutAmount, block.timestamp);
             }
         }
     }
