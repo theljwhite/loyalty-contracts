@@ -235,7 +235,7 @@ describe("LoyaltyProgram", async () => {
       "Incorrect - remaining bal from contract events mismatches contract state"
     );
   });
-  it("explores more basic aggregate analytics just based off of emitted ERC1155 escrow events", async () => {
+  it("explores more basic aggregate analytics just based off of emitted ERC1155 escrow and program events", async () => {
     const objectiveEvents = await getAllContractLogsForEvent(
       programOne,
       "ObjectiveCompleted"
@@ -308,7 +308,46 @@ describe("LoyaltyProgram", async () => {
     const correctListShape = [...correctFirstFiveUsers, ...correctNextTenUsers];
 
     expect(pointsList).deep.equal(correctListShape);
+  });
+  it("continues exploring more aggregate analytics just based off of emitted ERC1155 escrow events", async () => {
+    const rewardEvents = await getAllContractLogsForEvent(
+      escrowOne,
+      "ERC1155Rewarded"
+    );
 
-    //...TODO continue
+    //get token balance of each user from events.
+    //show aggregate list of user addresses and rewarded balances
+    const userEventBalances = rewardEvents.reduce((prev, curr) => {
+      const user = curr.args[0];
+      const tokenId = curr.args[1].toNumber();
+      const amount = curr.args[2].toNumber();
+
+      if (!prev[user]) prev[user] = [];
+      prev[user].push({ tokenId, amount });
+
+      return prev;
+    }, {});
+
+    expect(Object.keys(userEventBalances).length).equal(15);
+
+    const userOneEventBal = userEventBalances[users[0].address];
+    const userFifteenEventBal = userEventBalances[users[14].address];
+
+    const correctUserOneBalShape = [
+      {
+        tokenId: 0,
+        amount: 1,
+      },
+      { tokenId: 1, amount: 1 },
+      { tokenId: 2, amount: 1 },
+      { tokenId: 3, amount: 2 },
+    ];
+    const correctUserFifteenBalShape = [
+      ...correctUserOneBalShape,
+      { tokenId: 0, amount: 4 },
+    ];
+
+    expect(userOneEventBal).deep.equal(correctUserOneBalShape);
+    expect(userFifteenEventBal).deep.equal(correctUserFifteenBalShape);
   });
 });
