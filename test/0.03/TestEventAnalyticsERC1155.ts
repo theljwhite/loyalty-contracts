@@ -1,7 +1,7 @@
 import { expect } from "chai";
 import hre from "hardhat";
 import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers";
-import { ONE_MONTH_MS, THREE_DAYS_MS } from "../../constants/timeAndDate";
+import { THREE_DAYS_MS } from "../../constants/timeAndDate";
 import { moveTime } from "../../utils/moveTime";
 import {
   deployProgramAndSetUpUntilDepositPeriod,
@@ -78,8 +78,8 @@ describe("LoyaltyProgram", async () => {
     expect(escrowOne.address).to.not.be.undefined;
 
     //deposit reward tokens to be used for rewards
-    const tokenIdsToDeposit = [0, 1, 2, 3, 4];
-    const amountsToDeposit = Array(5).fill(800);
+    const tokenIdsToDeposit = [0, 1, 2, 3];
+    const amountsToDeposit = Array(4).fill(800);
 
     await testCollection
       .connect(creatorOne)
@@ -177,6 +177,138 @@ describe("LoyaltyProgram", async () => {
     expect(uniqueERC1155EventAddresses.size).equal(users.length);
 
     //get total amounts rewarded of each token id
+    const tokenAmounts = rewardEvents.reduce((prev, curr) => {
+      const tokenId = curr.args[1].toNumber();
+      const amount = curr.args[2].toNumber();
+
+      if (!prev[tokenId]) prev[tokenId] = 0;
+      prev[tokenId] = amount + prev[tokenId];
+      return prev;
+    }, {});
+
+    expect(tokenAmounts["0"]).equal(55, "Incorrect - sb 55 token id 0's");
+    expect(tokenAmounts["1"]).equal(15, "Incorrect - sb 15 token id 1's");
+    expect(tokenAmounts["2"]).equal(15, "Incorrect - sb 15 token id 2's");
+    expect(tokenAmounts["3"]).equal(30, "Incorrect - sb 30 token id 3's");
+
+    //count the instances of token ids being rewarded (not the amounts).
+    //the number of events where any amounts of each token id were rewarded.
+    const tokenInstances = rewardEvents.reduce((prev, curr) => {
+      const tokenId = curr.args[1].toNumber();
+
+      if (!prev[tokenId]) prev[tokenId] = 0;
+      ++prev[tokenId];
+      return prev;
+    }, {});
+
+    expect(tokenInstances["0"]).equal(25);
+    expect(tokenInstances["1"]).equal(15);
+    expect(tokenInstances["2"]).equal(15);
+    expect(tokenInstances["3"]).equal(15);
+
+    //get total amount of each deposited token ids remaining in escrow.
+    //without using contract state, only emitted events.
+    const initTokenDepositAmounts = Array(4).fill(800);
+
+    const remainingEscrowBalanceEvents = Object.entries(tokenAmounts).map(
+      ([key, value]) => ({
+        tokenId: key,
+        value:
+          initTokenDepositAmounts[key as keyof typeof initTokenDepositAmounts] -
+          Number(value),
+      })
+    );
+
+    //verify that it matches actual contract state
+    const remainingEscrowBalanceContract = [];
+
+    for (let tokenId = 0; tokenId < initTokenDepositAmounts.length; tokenId++) {
+      const balance = await escrowOne.getEscrowTokenBalance(tokenId);
+      remainingEscrowBalanceContract.push({
+        tokenId: String(tokenId),
+        value: balance.toNumber(),
+      });
+    }
+
+    expect(remainingEscrowBalanceEvents).deep.equal(
+      remainingEscrowBalanceContract,
+      "Incorrect - remaining bal from contract events mismatches contract state"
+    );
+  });
+  it("explores more basic aggregate analytics just based off of emitted ERC1155 escrow events", async () => {
+    const objectiveEvents = await getAllContractLogsForEvent(
+      programOne,
+      "ObjectiveCompleted"
+    );
+    const rewardEvents = await getAllContractLogsForEvent(
+      escrowOne,
+      "ERC1155Rewarded"
+    );
+
+    //get aggregate list of user points only from events and not contract state.
+    //this should be a simple call in a db, as wont have to iterate every event, but still
+    const userLastEvents = objectiveEvents.reduce((prev, curr) => {
+      const user = curr.args[0];
+      const currTimestamp = curr.args[2].toNumber();
+      if (!prev[user]) prev[user] = curr;
+
+      if (currTimestamp > prev[user].args[2].toNumber()) {
+        prev[user] = curr;
+      }
+
+      return prev;
+    }, {});
+
+    expect(Object.keys(userLastEvents).length).equal(users.length);
+
+    //verify that a user who completed all 5 objectives has correct total points,
+    //returned by the events. args 3 is the totalPoints event topic.
+    const userFifteen = users[14].address;
+    const userFifteenPointsTotal = userLastEvents[userFifteen].args[3];
+    const { rewardsEarned: userFifteenPointsFromContract } =
+      await programOne.getUserProgression(userFifteen);
+
+    expect(userFifteenPointsTotal.toNumber()).equal(
+      7800,
+      "Incorrect points total from events"
+    );
+    expect(userFifteenPointsFromContract.toNumber()).equal(
+      7800,
+      "Incorrect points total in contract state"
+    );
+
+    //verify that a user who completed only 4 objectives has correct total points,
+    //returned by the events
+    const userOne = users[0].address;
+    const userOnePointsTotal = userLastEvents[userOne].args[3];
+    const { rewardsEarned: userOnePointsFromContract } =
+      await programOne.getUserProgression(userOne);
+
+    expect(userOnePointsTotal.toNumber()).equal(
+      3800,
+      "Incorrect points from events"
+    );
+    expect(userOnePointsFromContract.toNumber()).equal(
+      3800,
+      "Incorrect points from contract"
+    );
+
+    //show aggregate list of user addresses and total points
+    const pointsList = Object.entries(userLastEvents).map(([key, value]) => ({
+      user: key,
+      points: (value as Record<string, any>).args[3].toNumber(),
+    }));
+
+    const correctFirstFiveUsers = users
+      .slice(0, 5)
+      .map((user) => ({ user: user.address, points: 3800 }));
+    const correctNextTenUsers = users
+      .slice(-10)
+      .map((user) => ({ user: user.address, points: 7800 }));
+    const correctListShape = [...correctFirstFiveUsers, ...correctNextTenUsers];
+
+    expect(pointsList).deep.equal(correctListShape);
+
     //...TODO continue
   });
 });
