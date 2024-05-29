@@ -1,7 +1,7 @@
 import { expect } from "chai";
 import hre from "hardhat";
 import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers";
-import { THREE_DAYS_MS } from "../../constants/timeAndDate";
+import { ONE_MONTH_MS, THREE_DAYS_MS } from "../../constants/timeAndDate";
 import { moveTime } from "../../utils/moveTime";
 import {
   deployProgramAndSetUpUntilDepositPeriod,
@@ -349,5 +349,62 @@ describe("LoyaltyProgram", async () => {
 
     expect(userOneEventBal).deep.equal(correctUserOneBalShape);
     expect(userFifteenEventBal).deep.equal(correctUserFifteenBalShape);
+
+    //estimate time users took to withdraw tokens from time of last reward.
+    //move time forward about 1 month
+    await moveTime(ONE_MONTH_MS);
+
+    //withdraw tokens for first five users
+    const firstFiveUsers = users.slice(0, 5);
+
+    for (const user of firstFiveUsers) {
+      await escrowOne.connect(user).userWithdrawAll();
+    }
+
+    const withdrawEventsOne = await getAllContractLogsForEvent(
+      escrowOne,
+      "UserWithdrawAll"
+    );
+
+    expect(withdrawEventsOne.length).equal(5);
+
+    //move time forward about 2 months again and withdraw with next set of users
+    await moveTime(ONE_MONTH_MS * 2);
+
+    const nextFiveUsers = users.slice(6, 11);
+
+    for (const user of nextFiveUsers) {
+      await escrowOne.connect(user).userWithdrawAll();
+    }
+
+    const withdrawEventsTwo = await getAllContractLogsForEvent(
+      escrowOne,
+      "UserWithdrawAll"
+    );
+
+    //get users last rewarded token timestamp
+    const usersWhoWithdrew = [...firstFiveUsers, ...nextFiveUsers].map(
+      (user) => user.address
+    );
+
+    const onlyWithdrawUserEvents = rewardEvents.filter((event) =>
+      usersWhoWithdrew.some((address) => address === event.args[0])
+    );
+
+    const userLastEvents = onlyWithdrawUserEvents.reduce((prev, curr) => {
+      const user = curr.args[0];
+      const currTimestamp = curr.args[3].toNumber();
+      if (!prev[user]) prev[user] = curr;
+
+      if (currTimestamp > prev[user].args[2].toNumber()) {
+        prev[user] = curr;
+      }
+
+      return prev;
+    }, {});
+
+    expect(Object.keys(userLastEvents).length).equal(usersWhoWithdrew.length);
+
+    //..TODO unfinished
   });
 });

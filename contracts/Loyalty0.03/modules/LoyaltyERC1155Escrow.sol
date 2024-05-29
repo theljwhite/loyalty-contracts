@@ -5,6 +5,7 @@ import "../LoyaltyProgram.sol";
 import "@openzeppelin/contracts/token/ERC1155/utils/ERC1155Holder.sol";
 import "@openzeppelin/contracts/token/ERC1155/ERC1155.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
+import "hardhat/console.sol";
 
 contract LoyaltyERC1155Escrow is ERC1155Holder, Ownable {
     enum EscrowState {
@@ -473,15 +474,16 @@ contract LoyaltyERC1155Escrow is ERC1155Holder, Ownable {
     function userWithdrawAll() external {
         UserAccount storage user = userAccount[msg.sender];
         UserTokenBalance[] storage userBalance = user.rewardedTokenBalances;
+
         if (user.allFundsPaid || userBalance.length == 0)
             revert NoTokensToWithdraw();
 
         if (user.allFundsLocked || escrowState() == EscrowState.Frozen)
             revert FundsAreLocked();
 
-        uint256[] memory rewardedTokenIds = new uint256[](escrow.tokens.length);
+        uint256[] memory rewardedTokenIds = new uint256[](userBalance.length);
         uint256[] memory rewardedTokenAmounts = new uint256[](
-            escrow.tokens.length
+            userBalance.length
         );
 
         for (uint256 i = 0; i < userBalance.length; i++) {
