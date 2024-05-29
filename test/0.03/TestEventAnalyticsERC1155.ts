@@ -381,8 +381,6 @@ describe("LoyaltyProgram", async () => {
       escrowOne,
       "UserWithdrawAll"
     );
-
-    //get users last rewarded token timestamp
     const usersWhoWithdrew = [...firstFiveUsers, ...nextFiveUsers].map(
       (user) => user.address
     );
@@ -391,6 +389,7 @@ describe("LoyaltyProgram", async () => {
       usersWhoWithdrew.some((address) => address === event.args[0])
     );
 
+    //get most recent rewarded timestamp for each user
     const userLastEvents = onlyWithdrawUserEvents.reduce((prev, curr) => {
       const user = curr.args[0];
       const currTimestamp = curr.args[3].toNumber();
@@ -399,12 +398,79 @@ describe("LoyaltyProgram", async () => {
       if (currTimestamp > prev[user].args[2].toNumber()) {
         prev[user] = curr;
       }
+      return prev;
+    }, {});
 
+    const userLastEventsArr = Object.entries(userLastEvents).map(
+      ([key, value]) => ({
+        user: key,
+        rewardedAt: (value as Record<string, any>).args[3],
+      })
+    );
+
+    //get earliest (only in this case) withdraw event for each user
+    const userToFirstWithdraw = withdrawEventsTwo.reduce((prev, curr) => {
+      const user = curr.args[0];
+      const currTimestamp = curr.args[3].toNumber();
+
+      if (!prev[user]) prev[user] = currTimestamp;
+
+      if (currTimestamp < prev[user]) {
+        prev[user] = currTimestamp;
+      }
       return prev;
     }, {});
 
     expect(Object.keys(userLastEvents).length).equal(usersWhoWithdrew.length);
+    expect(Object.keys(userToFirstWithdraw).length).equal(
+      usersWhoWithdrew.length
+    );
 
-    //..TODO unfinished
+    const userWithdrawTimes = userLastEventsArr.map(
+      (item) => userToFirstWithdraw[item.user] - item.rewardedAt.toNumber()
+    );
+    const averageTimeToWithdraw =
+      userWithdrawTimes.reduce((prev, curr) => prev + curr, 0) /
+      userWithdrawTimes.length;
+
+    const avgWithdrawTimeDays = Math.floor(
+      Math.floor(averageTimeToWithdraw) / 86_400
+    );
+
+    expect(avgWithdrawTimeDays).equal(
+      42,
+      "Incorrect - avg withdraw time was roughly 42 days"
+    );
+  });
+  it("continues exploring more aggregate analytics just based off of emitted ERC1155 escrow events", async () => {
+    //get tokens in escrow still yet to be rewarded just by events and not using state
+
+    //initial deposit before program begin was these token ids and amounts
+    // [0, 1, 2, 3] - 800 of each token id
+
+    const rewardEvents = await getAllContractLogsForEvent(
+      escrowOne,
+      "ERC1155Rewarded"
+    );
+    const rewardedTokensCount = rewardEvents.reduce((prev, curr) => {
+      const tokenId = curr.args[1].toNumber();
+      const amount = curr.args[2].toNumber();
+      if (!prev[tokenId]) prev[tokenId] = 0;
+
+      prev[tokenId] = prev[tokenId] + amount;
+      return prev;
+    }, {});
+
+    //get amount for each token id from actual contract state
+    const stateBalances = [];
+    for (let tokenId = 0; tokenId < 4; tokenId++) {
+      const balance = await escrowOne.getEscrowTokenBalance(tokenId);
+      stateBalances.push(balance.toNumber());
+    }
+
+    expect(stateBalances[0]).equal(800 - rewardedTokensCount["0"]);
+    expect(stateBalances[1]).equal(800 - rewardedTokensCount["1"]);
+    expect(stateBalances[2]).equal(800 - rewardedTokensCount["2"]);
+    expect(stateBalances[3]).equal(800 - rewardedTokensCount["3"]);
   });
 });
