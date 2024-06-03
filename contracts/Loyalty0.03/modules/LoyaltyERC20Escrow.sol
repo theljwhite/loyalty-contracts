@@ -42,11 +42,6 @@ contract LoyaltyERC20Escrow {
         uint256 amount,
         uint256 withdrawnAt
     );
-    event ERC20EscrowSettingsChanged(
-        address indexed creator,
-        RewardCondition rewardCondition,
-        uint256 updatedAt
-    );
     event FrozenStateChange(address team, bool frozen, uint256 updatedAt);
 
     string public constant VERSION = "0.03";
@@ -397,11 +392,6 @@ contract LoyaltyERC20Escrow {
 
         areEscrowSettingsSet = true;
         rewardCondition = _rewardCondition;
-        emit ERC20EscrowSettingsChanged(
-            msg.sender,
-            _rewardCondition,
-            block.timestamp
-        );
     }
 
     function setEscrowSettingsAdvanced(
@@ -439,11 +429,6 @@ contract LoyaltyERC20Escrow {
             rewardCondition = RewardCondition.RewardPerTier;
         }
         areEscrowSettingsSet = true;
-        emit ERC20EscrowSettingsChanged(
-            msg.sender,
-            _rewardCondition,
-            block.timestamp
-        );
     }
 
     function verifyTokenBalance(uint256[] calldata _payouts) private view {

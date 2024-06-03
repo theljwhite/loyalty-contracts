@@ -70,11 +70,6 @@ contract LoyaltyERC1155Escrow is ERC1155Holder, Ownable {
         uint256[] tokenIds,
         uint256 receivedAt
     );
-    event ERC1155EscrowSettingsChanged(
-        address indexed creator,
-        RewardCondition rewardCondition,
-        uint256 updatedAt
-    );
     event ERC1155Rewarded(
         address user,
         uint256 token,
@@ -634,11 +629,6 @@ contract LoyaltyERC1155Escrow is ERC1155Holder, Ownable {
         escrow.rewardCondition = _condition;
         inIssuance = true;
         areEscrowSettingsSet = true;
-        emit ERC1155EscrowSettingsChanged(
-            msg.sender,
-            _condition,
-            block.timestamp
-        );
     }
 
     function setEscrowSettingsAdvanced(
@@ -682,11 +672,6 @@ contract LoyaltyERC1155Escrow is ERC1155Holder, Ownable {
         }
         inIssuance = true;
         areEscrowSettingsSet = true;
-        emit ERC1155EscrowSettingsChanged(
-            msg.sender,
-            _condition,
-            block.timestamp
-        );
     }
 
     function runSetEscrowSettingsChecksBasic(
