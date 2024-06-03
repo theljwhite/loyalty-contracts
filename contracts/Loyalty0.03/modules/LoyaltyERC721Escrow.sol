@@ -71,23 +71,22 @@ contract LoyaltyERC721Escrow is IERC721Receiver, Ownable {
         uint256 requestedAt
     );
     event TokenQueueReceived(uint256[] sortedTokenQueue, uint256 receivedAt);
-    event ERC721EscrowSettingsChanged(
-        address indexed creator,
-        RewardCondition rewardCondition,
-        RewardOrder rewardOrder,
-        uint256 updatedAt
-    );
-    event ERC721TokenRewarded(
+
+    event ERC721Rewarded(
         address indexed user,
         uint256 token,
         uint256 rewardedAt
     );
-    event UserWithdraw(
+    event ERC721UserWithdraw(
         address indexed user,
         uint256 token,
         uint256 withdrawnAt
     );
-    event CreatoWithdraw(address creator, uint256 token, uint256 withdrawnAt);
+    event ERC721CreatorWithdraw(
+        address creator,
+        uint256 token,
+        uint256 withdrawnAt
+    );
     event FrozenStateChange(address team, bool frozen, uint256 updatedAt);
 
     string public constant VERSION = "0.03";
@@ -362,7 +361,7 @@ contract LoyaltyERC721Escrow is IERC721Receiver, Ownable {
 
             tokenQueue.pop();
 
-            emit ERC721TokenRewarded(_user, rewardedToken, block.timestamp);
+            emit ERC721Rewarded(_user, rewardedToken, block.timestamp);
         } else revert TokenQueueLengthMismatch();
     }
 
@@ -378,7 +377,11 @@ contract LoyaltyERC721Escrow is IERC721Receiver, Ownable {
 
         for (uint256 i = 0; i < userBalance.length; i++) {
             collection.transferFrom(address(this), msg.sender, userBalance[i]);
-            emit UserWithdraw(msg.sender, userBalance[i], block.timestamp);
+            emit ERC721UserWithdraw(
+                msg.sender,
+                userBalance[i],
+                block.timestamp
+            );
         }
         delete userAccount[msg.sender].rewardedTokenBalance;
     }
@@ -393,7 +396,11 @@ contract LoyaltyERC721Escrow is IERC721Receiver, Ownable {
         for (uint256 i = 0; i < tokenQueue.length; i++) {
             collection.transferFrom(address(this), msg.sender, tokenQueue[i]);
             delete tokenQueue[i];
-            emit CreatoWithdraw(msg.sender, tokenQueue[i], block.timestamp);
+            emit ERC721CreatorWithdraw(
+                msg.sender,
+                tokenQueue[i],
+                block.timestamp
+            );
         }
     }
 
@@ -446,13 +453,6 @@ contract LoyaltyERC721Escrow is IERC721Receiver, Ownable {
         rewardCondition = _rewardCondition;
         areEscrowSettingsSet = true;
         sortTokenQueue(msg.sender, _rewardOrder);
-
-        emit ERC721EscrowSettingsChanged(
-            msg.sender,
-            _rewardCondition,
-            _rewardOrder,
-            block.timestamp
-        );
     }
 
     function sortTokenQueue(address _sender, RewardOrder _rewardOrder) private {

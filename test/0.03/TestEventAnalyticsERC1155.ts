@@ -447,7 +447,6 @@ describe("LoyaltyProgram", async () => {
 
     //initial deposit before program begin was these token ids and amounts
     // [0, 1, 2, 3] - 800 of each token id
-
     const rewardEvents = await getAllContractLogsForEvent(
       escrowOne,
       "ERC1155Rewarded"
@@ -472,5 +471,6 @@ describe("LoyaltyProgram", async () => {
     expect(stateBalances[1]).equal(800 - rewardedTokensCount["1"]);
     expect(stateBalances[2]).equal(800 - rewardedTokensCount["2"]);
     expect(stateBalances[3]).equal(800 - rewardedTokensCount["3"]);
+    console.log("r", rewardEvents);
   });
 });

@@ -81,19 +81,19 @@ contract LoyaltyERC1155Escrow is ERC1155Holder, Ownable {
         uint256 amount,
         uint256 rewardedAt
     );
-    event CreatorWithdrawAll(
+    event ERC1155CreatorWithdrawAll(
         address creator,
         uint256[] tokenIds,
         uint256[] amounts,
         uint256 withdrawnAt
     );
-    event UserWithdrawAll(
+    event ERC1155UserWithdrawAll(
         address user,
         uint256[] tokenIds,
         uint256[] amounts,
         uint256 withdrawnAt
     );
-    event CreatorWithdraw(
+    event ERC1155CreatorWithdraw(
         address creator,
         uint256 tokenId,
         uint256 amount,
@@ -504,7 +504,7 @@ contract LoyaltyERC1155Escrow is ERC1155Holder, Ownable {
         user.allFundsPaid = true;
         delete user.rewardedTokenBalances;
 
-        emit UserWithdrawAll(
+        emit ERC1155UserWithdrawAll(
             msg.sender,
             rewardedTokenIds,
             rewardedTokenAmounts,
@@ -541,7 +541,7 @@ contract LoyaltyERC1155Escrow is ERC1155Holder, Ownable {
             bytes("")
         );
 
-        emit CreatorWithdrawAll(
+        emit ERC1155CreatorWithdrawAll(
             msg.sender,
             tokenIds,
             tokenAmounts,
@@ -580,7 +580,7 @@ contract LoyaltyERC1155Escrow is ERC1155Holder, Ownable {
 
         tokenBalances[_tokenId] -= withdrawAmount;
 
-        emit CreatorWithdraw(
+        emit ERC1155CreatorWithdraw(
             msg.sender,
             _tokenId,
             withdrawAmount,

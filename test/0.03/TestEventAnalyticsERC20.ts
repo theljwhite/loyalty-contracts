@@ -1,11 +1,7 @@
 import { expect } from "chai";
 import hre from "hardhat";
 import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers";
-import {
-  ONE_MONTH_MS,
-  ONE_MONTH_SECONDS,
-  THREE_DAYS_MS,
-} from "../../constants/timeAndDate";
+import { ONE_MONTH_MS, THREE_DAYS_MS } from "../../constants/timeAndDate";
 import { moveTime } from "../../utils/moveTime";
 import { deployProgramAndSetUpUntilDepositPeriod } from "../../utils/deployLoyaltyUtils";
 import {
@@ -17,7 +13,6 @@ import {
 import { calculateRootHash } from "../../utils/merkleUtils";
 import { depositKeyBytes32 } from "../../constants/basicLoyaltyConstructorArgs";
 import { getAllContractLogsForEvent } from "../../utils/eventsUtils";
-import { time } from "@nomicfoundation/hardhat-toolbox-viem/network-helpers";
 
 let accounts: SignerWithAddress[] = [];
 let creatorOne: SignerWithAddress;
