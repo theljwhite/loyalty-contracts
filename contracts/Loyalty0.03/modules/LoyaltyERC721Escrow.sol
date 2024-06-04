@@ -64,6 +64,11 @@ contract LoyaltyERC721Escrow is IERC721Receiver, Ownable {
         uint256 tokenId,
         uint256 receivedAt
     );
+    event ERC721BatchReceived(
+        address from,
+        uint256[] tokens,
+        uint256 receivedAt
+    );
     event SortTokenQueue(
         address creator,
         uint256[] tokensArr,
@@ -287,6 +292,7 @@ contract LoyaltyERC721Escrow is IERC721Receiver, Ownable {
                 _depositKey
             );
         }
+        emit ERC721BatchReceived(msg.sender, _tokenIds, block.timestamp);
     }
 
     function safeBatchTransfer(
@@ -302,6 +308,7 @@ contract LoyaltyERC721Escrow is IERC721Receiver, Ownable {
                 _depositKey
             );
         }
+        emit ERC721BatchReceived(msg.sender, _tokenIds, block.timestamp);
     }
 
     function handleRewardsUnlock(
