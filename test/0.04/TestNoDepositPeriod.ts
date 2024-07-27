@@ -217,5 +217,10 @@ describe("LoyaltyProgram", async () => {
     const escrowBalThree = await escrowOne.escrowBalance();
 
     expect(hre.ethers.utils.formatEther(escrowBalThree)).equal("1.14");
+
+    //actual balance of escrow contract (combined escrow bal) and user bal stored in contract
+    //should be 1.17 - the 0.03 rewarded to user 2 and the escrow balance 1.14
+    const escrowContractBal = await testToken.balanceOf(escrowOne.address);
+    expect(hre.ethers.utils.formatEther(escrowContractBal)).equal("1.17");
   });
 });
