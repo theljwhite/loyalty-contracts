@@ -7,7 +7,6 @@ export enum RewardType {
 
 export enum LoyaltyState {
   Idle,
-  AwaitingEscrowSetup,
   Active,
   Completed,
   Canceled,
@@ -15,7 +14,6 @@ export enum LoyaltyState {
 
 export enum EscrowState {
   Idle,
-  DepositPeriod,
   AwaitingEscrowSettings,
   InIssuance,
   Completed,

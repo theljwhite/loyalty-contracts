@@ -10,7 +10,6 @@ contract LoyaltyERC20Escrow {
 
     enum EscrowState {
         Idle,
-        DepositPeriod,
         AwaitingEscrowSettings,
         InIssuance,
         Completed,
@@ -77,7 +76,6 @@ contract LoyaltyERC20Escrow {
 
     bool public canceled;
     bool public areEscrowSettingsSet;
-    bool public inIssuance;
 
     error OnlyCreatorCanCall();
     error OnlyTeamCanCall();
@@ -147,20 +145,8 @@ contract LoyaltyERC20Escrow {
         }
         if (allFundsLocked) return EscrowState.Frozen;
 
-        if (
-            depositStartDate <= block.timestamp &&
-            depositEndDate >= block.timestamp &&
-            isDepositKeySet
-        ) {
-            return EscrowState.DepositPeriod;
-        }
-        if (
-            block.timestamp > depositEndDate &&
-            !areEscrowSettingsSet &&
-            isDepositKeySet
-        ) {
-            return EscrowState.AwaitingEscrowSettings;
-        }
+        if (!areEscrowSettingsSet) return EscrowState.AwaitingEscrowSettings;
+
         if (
             areEscrowSettingsSet &&
             loyaltyProgram.state() == LoyaltyProgram.LoyaltyState.Active
@@ -177,8 +163,13 @@ contract LoyaltyERC20Escrow {
         bytes memory _key
     ) external returns (uint256) {
         if (!isSenderApproved(msg.sender)) revert CannotDeposit();
-        if (escrowState() != EscrowState.DepositPeriod)
+        if (
+            escrowState() != EscrowState.AwaitingEscrowSettings &&
+            escrowState() != EscrowState.InIssuance &&
+            escrowState() != EscrowState.Idle
+        ) {
             revert DepositPeriodNotActive();
+        }
         if (_amount == 0) revert CannotBeEmptyAmount();
 
         bytes32 depositKey;
@@ -192,7 +183,8 @@ contract LoyaltyERC20Escrow {
         rewardToken.safeIncreaseAllowance(address(this), _amount);
         rewardToken.safeTransferFrom(msg.sender, address(this), _amount);
 
-        escrowBalance = rewardToken.balanceOf(address(this));
+        escrowBalance += _amount;
+
         emit ERC20Deposit(
             msg.sender,
             rewardTokenAddress,
@@ -518,25 +510,12 @@ contract LoyaltyERC20Escrow {
         return isApprovedSender[_sender];
     }
 
-    function setDepositKey(bytes32 key, uint256 _depositEndDate) external {
+    function setDepositKey(bytes32 key) external {
         if (msg.sender != creator) revert OnlyCreatorCanCall();
-
-        uint256 minimumDepositPeriod = 1 hours;
-        uint256 depositToProgramEndBuffer = 4 hours;
-
-        if (_depositEndDate <= block.timestamp + minimumDepositPeriod) {
-            revert DepositPeriodMustBeAtLeastOneHour();
+        if (escrowState() != EscrowState.AwaitingEscrowSettings) {
+            revert();
         }
-
-        if (
-            _depositEndDate >= loyaltyProgramEndsAt + depositToProgramEndBuffer
-        ) {
-            revert DepositEndDateExceedsProgramEnd();
-        }
-
         validDepositKeys[key] = true;
-        depositStartDate = block.timestamp;
-        depositEndDate = _depositEndDate;
         isDepositKeySet = true;
     }
 

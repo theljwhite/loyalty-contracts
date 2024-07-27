@@ -52,8 +52,7 @@ export const deployLoyaltyProgram = async (
   rewardType: RewardType,
   withTiers: boolean,
   creator: SignerWithAddress,
-  rewardsAddress?: string,
-  merkleRoot?: string
+  rewardsAddress?: string
 ): Promise<DeployLoyaltyReturn> => {
   const loyaltyFactoryRoute =
     allContractRoutes[
@@ -78,8 +77,7 @@ export const deployLoyaltyProgram = async (
       programEndsAtDate,
       withTiers ? tierSortingActive : false,
       withTiers ? tierNamesBytes32 : [],
-      withTiers ? tierRewardsRequired : [],
-      merkleRoot
+      withTiers ? tierRewardsRequired : []
     );
 
   if (rewardType === RewardType.Points) {
@@ -125,16 +123,14 @@ export const deployProgramAndSetUpUntilDepositPeriod = async (
   rewardType: RewardType,
   withTiers: boolean,
   creator: SignerWithAddress,
-  rewardsAddress?: string,
-  merkleRoot?: string
+  rewardsAddress?: string
 ): Promise<DeployLoyaltyReturn> => {
   const { loyaltyAddress, escrowAddress } = await deployLoyaltyProgram(
     contractVersion,
     rewardType,
     withTiers,
     creator,
-    rewardsAddress,
-    merkleRoot
+    rewardsAddress
   );
 
   const loyaltyProgramContractRoute =
@@ -305,8 +301,7 @@ export const estimateGasDeploy = async (
   withTiers: boolean,
   creator: SignerWithAddress,
   loyaltyAddress: string,
-  rewardsAddress?: string,
-  merkleRoot?: string
+  rewardsAddress?: string
 ): Promise<{
   loyaltyGasEth: any;
   escrowGasEth: any;
@@ -333,7 +328,6 @@ export const estimateGasDeploy = async (
     withTiers ? true : false,
     withTiers ? tierNamesBytes32 : [],
     withTiers ? tierRewardsRequired : [],
-    merkleRoot,
   ];
 
   const lpDeployTx = loyaltyContractFactory.getDeployTransaction(

@@ -2,12 +2,11 @@
 pragma solidity ^0.8.19;
 
 import "./utils/LoyaltySorting.sol";
-import "./utils/LoyaltySecurity.sol";
 import "./interfaces/ILoyaltyERC1155Escrow.sol";
 import "./interfaces/ILoyaltyERC721Escrow.sol";
 import "./interfaces/ILoyaltyERC20Escrow.sol";
 
-abstract contract LoyaltyProgram is LoyaltySorting, LoyaltySecurity {
+abstract contract LoyaltyProgram is LoyaltySorting {
     enum RewardType {
         Points,
         ERC20,
@@ -17,7 +16,6 @@ abstract contract LoyaltyProgram is LoyaltySorting, LoyaltySecurity {
 
     enum LoyaltyState {
         Idle,
-        AwaitingEscrowSetup,
         Active,
         Completed,
         Canceled
@@ -345,13 +343,7 @@ abstract contract LoyaltyProgram is LoyaltySorting, LoyaltySecurity {
         );
     }
 
-    function deductPointsFromUser(
-        address _user,
-        uint256 _points,
-        bytes32[] memory _proof,
-        bytes32 _messageHash,
-        bytes memory _signature
-    ) external {
+    function deductPointsFromUser(address _user, uint256 _points) external {
         if (msg.sender != creator && !isRelayer[msg.sender]) {
             revert OnlyCreatorOrRelay();
         }
@@ -362,7 +354,6 @@ abstract contract LoyaltyProgram is LoyaltySorting, LoyaltySecurity {
             revert();
         }
 
-        handleProgressVerification(_user, _proof, _messageHash, _signature);
         users[_user].rewardsEarned -= _points;
 
         updateUserTierProgress(_user, 0);
@@ -372,20 +363,6 @@ abstract contract LoyaltyProgram is LoyaltySorting, LoyaltySecurity {
             _points,
             block.timestamp
         );
-    }
-
-    function handleProgressVerification(
-        address _user,
-        bytes32[] memory _proof,
-        bytes32 _messageHash,
-        bytes memory _signature
-    ) private {
-        if (users[_user].rewardsEarned == 0) {
-            if (!isSignatureVerified(_messageHash, _signature, msg.sender)) {
-                revert VerificationFailed();
-            }
-        }
-        merkleVerifyAndUpsert(_proof, _user);
     }
 
     function handleEscrowRewards(
@@ -548,27 +525,5 @@ abstract contract LoyaltyProgram is LoyaltySorting, LoyaltySecurity {
     function setRelayer(address _relayer) external {
         if (msg.sender != creator) revert OnlyCreatorCanCall();
         isRelayer[_relayer] = true;
-    }
-
-    //TEMP: temporary for testing usability of a safer call here
-    function safeSetEscrowContract(
-        address _contract,
-        RewardType _rewardType,
-        bytes32 _messageHash,
-        bytes memory _signature
-    ) external {
-        if (msg.sender != creator) revert OnlyCreatorCanCall();
-
-        if (!isSignatureVerified(_messageHash, _signature, msg.sender)) {
-            revert VerificationFailed();
-        }
-
-        if (_rewardType == RewardType.ERC20) {
-            erc20EscrowContract = ILoyaltyERC20Escrow(_contract);
-        } else if (_rewardType == RewardType.ERC721) {
-            erc721EscrowContract = ILoyaltyERC721Escrow(_contract);
-        } else if (_rewardType == RewardType.ERC1155) {
-            erc1155EscrowContract = ILoyaltyERC1155Escrow(_contract);
-        }
     }
 }
