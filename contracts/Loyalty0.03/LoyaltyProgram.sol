@@ -249,7 +249,7 @@ abstract contract LoyaltyProgram is LoyaltySorting {
             revert OnlyUserOrRelay();
         }
         if (_user == address(0)) revert UserCanNotBeZeroAddress();
-        if (!isActive) revert ProgramMustBeActive();
+        if (state() != LoyaltyState.Active) revert ProgramMustBeActive();
 
         Objective memory objective = objectives[_objectiveIndex];
 
@@ -285,7 +285,7 @@ abstract contract LoyaltyProgram is LoyaltySorting {
     ) external {
         if (msg.sender != creator) revert OnlyCreatorCanCall();
         if (_user == address(0)) revert UserCanNotBeZeroAddress();
-        if (!isActive) revert ProgramMustBeActive();
+        if (state() != LoyaltyState.Active) revert ProgramMustBeActive();
 
         Objective memory objective = objectives[_objectiveIndex];
 
@@ -320,7 +320,7 @@ abstract contract LoyaltyProgram is LoyaltySorting {
             revert OnlyCreatorOrRelay();
         }
         if (_user == address(0)) revert UserCanNotBeZeroAddress();
-        if (!isActive) revert ProgramMustBeActive();
+        if (state() != LoyaltyState.Active) revert ProgramMustBeActive();
         if (_points == 0 || _points > totalPointsPossible) revert();
 
         uint256 pointsGivenCopy = greatestPointsGiven;
@@ -348,7 +348,7 @@ abstract contract LoyaltyProgram is LoyaltySorting {
             revert OnlyCreatorOrRelay();
         }
         if (_user == address(0)) revert UserCanNotBeZeroAddress();
-        if (!isActive) revert ProgramMustBeActive();
+        if (state() != LoyaltyState.Active) revert ProgramMustBeActive();
 
         if (_points == 0 || _points > users[_user].rewardsEarned) {
             revert();
@@ -525,5 +525,10 @@ abstract contract LoyaltyProgram is LoyaltySorting {
     function setRelayer(address _relayer) external {
         if (msg.sender != creator) revert OnlyCreatorCanCall();
         isRelayer[_relayer] = true;
+    }
+
+    function cancelProgram() external {
+        if (msg.sender != creator) revert OnlyCreatorCanCall();
+        canceled = true;
     }
 }

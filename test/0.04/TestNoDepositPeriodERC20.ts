@@ -273,7 +273,6 @@ describe("LoyaltyProgram", async () => {
     expect(escrowState2).equal(EscrowState.InIssuance);
 
     //complete an objective as normal, reward unlock func should reward token.
-
     await programOne
       .connect(relayer)
       .completeUserAuthorityObjective(0, userThree.address);
@@ -293,5 +292,76 @@ describe("LoyaltyProgram", async () => {
       false,
       false,
     ]);
+
+    //cancel the loyalty program. escrow and loyalty state both sb canceled.
+    //ensure creator and users can still withdraw any existing funds.
+    //ensure objective completions etc revert now.
+    await programOne.connect(creatorOne).cancelProgram();
+
+    const lpState3 = await programOne.state();
+    const escrowState3 = await escrowOne.escrowState();
+
+    expect(lpState3).equal(LoyaltyState.Canceled);
+    expect(escrowState3).equal(EscrowState.Canceled);
+
+    //test user withdraws while frozen
+    const user3Wd = hre.ethers.utils.parseUnits("0.005");
+    await escrowOne.connect(userThree).userWithdraw(user3Wd);
+
+    const user3Bal1 = await escrowOne.lookupUserBalance(userThree.address);
+    expect(hre.ethers.utils.formatEther(user3Bal1)).equal(
+      "0.005",
+      "Incorrect u3 bal after first withdraw"
+    );
+
+    await escrowOne.connect(userThree).userWithdrawAll();
+    const user3Bal2 = await escrowOne.lookupUserBalance(userThree.address);
+
+    expect(hre.ethers.utils.formatEther(user3Bal2)).equal(
+      "0.0",
+      "Incorrect user3 escrow contract bal"
+    );
+
+    const user3WalletBal = await testToken.balanceOf(userThree.address);
+
+    expect(hre.ethers.utils.formatEther(user3WalletBal)).equal(
+      "0.01",
+      "Incorrect user 3 wallet balance"
+    );
+
+    //test creator withdraws while frozen
+    const escrowRemBalance = await escrowOne.escrowBalance();
+    const escrowRemBalEther = hre.ethers.utils.formatEther(escrowRemBalance);
+    expect(escrowRemBalEther).equal("1.32");
+
+    const creatorWdAmount2 = hre.ethers.utils.parseUnits("0.32", "ether");
+    await escrowOne.connect(creatorOne).creatorWithdraw(creatorWdAmount2);
+
+    const escrowRemBal2 = await escrowOne.escrowBalance();
+    const escrowRemBal2Ether = hre.ethers.utils.formatEther(escrowRemBal2);
+
+    expect(escrowRemBal2Ether).equal(
+      "1.0",
+      "Incorrect bal after 1st creator wd"
+    );
+
+    await escrowOne.connect(creatorOne).creatorWithdrawAll();
+
+    const escrowFinalBal = await escrowOne.escrowBalance();
+    const escrowFinalBalEther = hre.ethers.utils.formatEther(escrowFinalBal);
+
+    expect(escrowFinalBalEther).equal("0.0", "Incorrect final escrow bal");
+
+    //make sure complete obj and give points in LP now revert
+    const obj1 = programOne
+      .connect(relayer)
+      .completeUserAuthorityObjective(1, userThree.address);
+
+    const points1 = programOne
+      .connect(relayer)
+      .givePointsToUser(userThree.address, 100);
+
+    expect(obj1).to.be.rejectedWith("ProgramMustBeActive()");
+    expect(points1).to.be.rejectedWith("ProgramMustBeActive()");
   });
 });

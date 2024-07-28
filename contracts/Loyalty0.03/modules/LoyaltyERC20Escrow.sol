@@ -62,8 +62,7 @@ contract LoyaltyERC20Escrow {
     mapping(bytes32 => bool) validDepositKeys;
 
     uint256 public escrowBalance;
-    uint256 private depositStartDate;
-    uint256 private depositEndDate;
+
     bool private isDepositKeySet;
     bool public allFundsLocked;
 
@@ -82,11 +81,8 @@ contract LoyaltyERC20Escrow {
     error OnlyLoyaltyProgramCanCall();
     error CannotDeposit();
     error NotInIssuance();
-
-    error DepositPeriodMustBeAtLeastOneHour();
-    error DepositEndDateExceedsProgramEnd();
     error DepositPeriodNotActive();
-    error DepositPeriodMustBeFinished();
+
     error CannotBeEmptyAmount();
     error InsuffEscrowBal();
 
@@ -436,10 +432,12 @@ contract LoyaltyERC20Escrow {
         RewardCondition _rewardCondition
     ) private view {
         if (msg.sender != creator) revert OnlyCreatorCanCall();
-        if (escrowState() != EscrowState.AwaitingEscrowSettings)
-            revert DepositPeriodMustBeFinished();
-        if (_rewardCondition == RewardCondition.NotSet)
+        if (escrowState() != EscrowState.AwaitingEscrowSettings) {
+            revert InsufficientFunds();
+        }
+        if (_rewardCondition == RewardCondition.NotSet) {
             revert MustSetValidRewardCondition();
+        }
     }
 
     function userWithdrawAll() external returns (uint256) {
@@ -520,8 +518,9 @@ contract LoyaltyERC20Escrow {
     }
 
     function emergencyFreeze(bool _isFrozen) external {
-        if (msg.sender != TEAM_ADDRESS && msg.sender != creator)
-            revert OnlyTeamCanCall();
+        if (msg.sender != creator) revert OnlyCreatorCanCall();
+        if (escrowState() == EscrowState.Canceled) revert();
+
         allFundsLocked = _isFrozen;
         emit FrozenStateChange(msg.sender, _isFrozen, block.timestamp);
     }
