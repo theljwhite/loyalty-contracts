@@ -122,7 +122,6 @@ abstract contract LoyaltyProgram is LoyaltySorting {
     error UserCanNotBeZeroAddress();
     error OnlyUserOrRelay();
     error OnlyCreatorOrRelay();
-    error VerificationFailed();
 
     constructor(
         string memory _name,
