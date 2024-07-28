@@ -1,9 +1,6 @@
 import { expect } from "chai";
 import hre from "hardhat";
 import { type SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers";
-import { THREE_DAYS_MS } from "../../constants/timeAndDate";
-import { moveTime } from "../../utils/moveTime";
-import { time } from "@nomicfoundation/hardhat-toolbox-viem/network-helpers";
 import { deployLoyaltyProgram } from "../../utils/deployLoyaltyUtils";
 import {
   ERC20RewardCondition,
@@ -11,7 +8,6 @@ import {
   LoyaltyState,
   RewardType,
 } from "../../constants/contractEnums";
-import keccak256 from "keccak256";
 import { getERC20UserProgress } from "../../utils/userProgressTestUtils";
 import { depositKeyBytes32 } from "../../constants/basicLoyaltyConstructorArgs";
 
@@ -27,16 +23,12 @@ let relayer: SignerWithAddress;
 
 let userOne: SignerWithAddress;
 let userTwo: SignerWithAddress;
+let userThree: SignerWithAddress;
 
 let programOne: any;
 let escrowOne: any;
-let programTwo: any;
-let escrowTwo: any;
 
 let testToken: any;
-let testTokenTwo: any;
-
-const treeAddresses: string[] = [];
 
 describe("LoyaltyProgram", async () => {
   before(async () => {
@@ -46,6 +38,7 @@ describe("LoyaltyProgram", async () => {
     relayer = accounts[5];
     userOne = accounts[10];
     userTwo = accounts[11];
+    userThree = accounts[12];
 
     //deploy test ERC20 token to be used for ERC20 escrow rewards
     //transfer amount from minter to creatorOne to deposit as rewards
@@ -222,5 +215,83 @@ describe("LoyaltyProgram", async () => {
     //should be 1.17 - the 0.03 rewarded to user 2 and the escrow balance 1.14
     const escrowContractBal = await testToken.balanceOf(escrowOne.address);
     expect(hre.ethers.utils.formatEther(escrowContractBal)).equal("1.17");
+  });
+  it("tests freezing/cancelling contract states with new contract version", async () => {
+    //test state and functionality that shouldnt be permitted while frozen
+    await escrowOne.connect(creatorOne).emergencyFreeze(true);
+
+    const lpState = await programOne.state();
+    const escrowState = await escrowOne.escrowState();
+
+    expect(lpState).equal(LoyaltyState.Active);
+    expect(escrowState).equal(EscrowState.Frozen);
+
+    // //try to withdraw as user 2 which should not be allowed
+    const withdrawAmount = hre.ethers.utils.parseUnits("0.01", "ether");
+
+    const wd = escrowOne.connect(userTwo).userWithdraw(withdrawAmount);
+    const wdAll = escrowOne.connect(userTwo).userWithdrawAll();
+
+    expect(wd).to.be.rejected;
+    expect(wdAll).to.be.rejected;
+
+    const obj = programOne
+      .connect(relayer)
+      .completeUserAuthorityObjective(3, userTwo.address);
+
+    expect(obj).to.be.rejectedWith("NotInIssuance()");
+
+    //try to deposit, should revert
+    const deposit = escrowOne
+      .connect(creatorOne)
+      .depositBudget(
+        hre.ethers.utils.parseUnits("0.2", "ether"),
+        depositKeyBytes32
+      );
+
+    expect(deposit).to.be.rejectedWith("DepositPeriodNotActive()");
+
+    //try to  withdraw as creator, should revert
+    const creatorWdAmount = hre.ethers.utils.parseUnits("0.2", "ether");
+
+    const creatorWd = escrowOne
+      .connect(creatorOne)
+      .creatorWithdraw(creatorWdAmount);
+    const creatorWdAll = escrowOne.connect(creatorOne).creatorWithdrawAll();
+
+    expect(creatorWd).to.be.rejectedWith("FundAreLocked()");
+    expect(creatorWdAll).to.be.rejectedWith("FundsAreLocked()");
+
+    //unfreeze the escrow contract, ensure it continues to behave as normally.
+    //state should go back to previous before freezs.
+    await escrowOne.emergencyFreeze(false);
+
+    const lpState2 = await programOne.state();
+    const escrowState2 = await escrowOne.escrowState();
+
+    expect(lpState2).equal(LoyaltyState.Active);
+    expect(escrowState2).equal(EscrowState.InIssuance);
+
+    //complete an objective as normal, reward unlock func should reward token.
+
+    await programOne
+      .connect(relayer)
+      .completeUserAuthorityObjective(0, userThree.address);
+
+    const u3Prog = await getERC20UserProgress(
+      programOne,
+      escrowOne,
+      userThree,
+      creatorOne
+    );
+
+    expect(hre.ethers.utils.formatEther(u3Prog.balance)).equal("0.01");
+    expect(u3Prog.userObjsComplete).deep.equal([
+      true,
+      false,
+      false,
+      false,
+      false,
+    ]);
   });
 });

@@ -51,9 +51,9 @@ export const getERC20UserProgress = async (
     .lookupUserBalance(user.address);
 
   return {
-    points: progress.rewardsEarned.toNumber(),
-    currentTier: progress.currentTier.toNumber(),
+    points: progress.rewardsEarned,
+    currentTier: progress.currentTier,
     userObjsComplete: userCompletedObjectives,
-    balance: balance.toNumber(),
+    balance: balance,
   };
 };

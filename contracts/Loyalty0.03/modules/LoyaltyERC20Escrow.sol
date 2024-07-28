@@ -520,7 +520,8 @@ contract LoyaltyERC20Escrow {
     }
 
     function emergencyFreeze(bool _isFrozen) external {
-        if (msg.sender != TEAM_ADDRESS) revert OnlyTeamCanCall();
+        if (msg.sender != TEAM_ADDRESS && msg.sender != creator)
+            revert OnlyTeamCanCall();
         allFundsLocked = _isFrozen;
         emit FrozenStateChange(msg.sender, _isFrozen, block.timestamp);
     }
