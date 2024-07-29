@@ -199,6 +199,7 @@ contract LoyaltyERC20Escrow {
     ) external {
         if (msg.sender != loyaltyProgramAddress)
             revert OnlyLoyaltyProgramCanCall();
+        if (escrowState() == EscrowState.Canceled) return;
         if (escrowState() != EscrowState.InIssuance) revert NotInIssuance();
         if (rewardCondition == RewardCondition.NotSet)
             revert IncorrectRewardCondition();

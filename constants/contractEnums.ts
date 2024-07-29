@@ -21,6 +21,16 @@ export enum EscrowState {
   Canceled,
 }
 
+export enum ERC721EscrowState {
+  Idle,
+  DepositPeriod,
+  AwaitingEscrowSettings,
+  InIssuance,
+  Completed,
+  Frozen,
+  Canceled,
+}
+
 export enum ERC20RewardCondition {
   NotSet,
   AllObjectivesComplete,

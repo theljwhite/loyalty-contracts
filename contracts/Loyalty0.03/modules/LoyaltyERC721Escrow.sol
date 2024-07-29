@@ -152,7 +152,7 @@ contract LoyaltyERC721Escrow is IERC721Receiver, Ownable {
     error NotInIssuance();
     error RewardOrderNotSet();
     error NoTokensToWithdraw();
-    error LoyaltyProgramMustBeCompleted();
+    error MustBeActiveOrCompleted();
     error ExceededMaxDepositors();
     error IncorrectDepositKey();
 
@@ -318,6 +318,7 @@ contract LoyaltyERC721Escrow is IERC721Receiver, Ownable {
     ) external {
         if (msg.sender != loyaltyProgramAddress)
             revert OnlyLoyaltyProgramCanCall();
+        if (escrowState() == EscrowState.Canceled) return;
         if (escrowState() != EscrowState.InIssuance) revert NotInIssuance();
 
         bool alreadyRewarded = userAccount[_user].didReachGoal;
@@ -377,8 +378,9 @@ contract LoyaltyERC721Escrow is IERC721Receiver, Ownable {
         uint256[] memory userBalance = user.rewardedTokenBalance;
 
         if (userBalance.length == 0) revert NoTokensToWithdraw();
-        if (escrowState() == EscrowState.Frozen || !user.didReachGoal)
+        if (escrowState() == EscrowState.Frozen || !user.didReachGoal) {
             revert FundsAreLocked();
+        }
 
         IERC721 collection = IERC721(collectionAddress);
 
@@ -395,8 +397,12 @@ contract LoyaltyERC721Escrow is IERC721Receiver, Ownable {
 
     function creatorWithdrawAll() external {
         if (msg.sender != creator) revert OnlyCreatorCanCall();
-        if (escrowState() != EscrowState.Completed)
-            revert LoyaltyProgramMustBeCompleted();
+        if (
+            escrowState() != EscrowState.Completed &&
+            escrowState() != EscrowState.Canceled
+        ) {
+            revert MustBeActiveOrCompleted();
+        }
         if (tokenQueue.length == 0) revert NoTokensToWithdraw();
 
         IERC721 collection = IERC721(collectionAddress);
@@ -559,7 +565,9 @@ contract LoyaltyERC721Escrow is IERC721Receiver, Ownable {
     }
 
     function emergencyFreeze(bool _isFrozen) external {
-        if (msg.sender != TEAM_ADDRESS) revert OnlyTeamCanCall();
+        if (msg.sender != creator) revert OnlyCreatorCanCall();
+        if (escrowState() == EscrowState.Canceled) revert();
+
         allFundsLocked = _isFrozen;
         emit FrozenStateChange(msg.sender, _isFrozen, block.timestamp);
     }
