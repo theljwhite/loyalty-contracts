@@ -5,7 +5,6 @@ import "../LoyaltyProgram.sol";
 import "@openzeppelin/contracts/token/ERC1155/utils/ERC1155Holder.sol";
 import "@openzeppelin/contracts/token/ERC1155/ERC1155.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
-import "hardhat/console.sol";
 
 contract LoyaltyERC1155Escrow is ERC1155Holder, Ownable {
     enum EscrowState {
@@ -135,7 +134,7 @@ contract LoyaltyERC1155Escrow is ERC1155Holder, Ownable {
     error OnlyLoyaltyProgramCanCall();
 
     error LoyaltyProgramMustBeIdle();
-    error LoyaltyProgramMustBeCompleted();
+    error MustBeCompleteOrCanceled();
     error IncorrectRewardType();
     error IncorrectRewardCondition();
     error DepositsAreLocked();
@@ -314,9 +313,10 @@ contract LoyaltyERC1155Escrow is ERC1155Holder, Ownable {
         uint256 _tierIndex,
         uint256[] memory _passedTiers
     ) external {
-        if (msg.sender != loyaltyProgramAddress)
+        if (msg.sender != loyaltyProgramAddress) {
             revert OnlyLoyaltyProgramCanCall();
-
+        }
+        if (escrowState() == EscrowState.Canceled) return;
         if (escrowState() != EscrowState.InIssuance) revert NotInIssuance();
         if (escrow.rewardCondition == RewardCondition.NotSet) {
             revert IncorrectRewardCondition();
@@ -473,8 +473,9 @@ contract LoyaltyERC1155Escrow is ERC1155Holder, Ownable {
         if (user.allFundsPaid || userBalance.length == 0)
             revert NoTokensToWithdraw();
 
-        if (user.allFundsLocked || escrowState() == EscrowState.Frozen)
+        if (user.allFundsLocked || escrowState() == EscrowState.Frozen) {
             revert FundsAreLocked();
+        }
 
         uint256[] memory rewardedTokenIds = new uint256[](userBalance.length);
         uint256[] memory rewardedTokenAmounts = new uint256[](
@@ -509,10 +510,15 @@ contract LoyaltyERC1155Escrow is ERC1155Holder, Ownable {
 
     function creatorWithdrawAllBalance() external {
         if (msg.sender != creator) revert OnlyCreatorCanCall();
-        if (escrowState() != EscrowState.Completed)
-            revert LoyaltyProgramMustBeCompleted();
-        if (escrow.totalTokenIds == 0 || escrow.allFundsPaid)
+        if (
+            escrowState() != EscrowState.Completed &&
+            escrowState() != EscrowState.Canceled
+        ) {
+            revert MustBeCompleteOrCanceled();
+        }
+        if (escrow.totalTokenIds == 0 || escrow.allFundsPaid) {
             revert NoTokensToWithdraw();
+        }
 
         uint256[] memory tokenAmounts = new uint256[](escrow.tokens.length);
         uint256[] memory tokenIds = new uint256[](escrow.tokens.length);
@@ -550,8 +556,12 @@ contract LoyaltyERC1155Escrow is ERC1155Holder, Ownable {
 
     function creatorWithdrawToken(uint256 _tokenId, uint256 _amount) external {
         if (msg.sender != creator) revert OnlyCreatorCanCall();
-        if (escrowState() != EscrowState.Completed)
-            revert LoyaltyProgramMustBeCompleted();
+        if (
+            escrowState() != EscrowState.Completed &&
+            escrowState() != EscrowState.Canceled
+        ) {
+            revert MustBeCompleteOrCanceled();
+        }
 
         uint256 withdrawAmount = tokenBalances[_tokenId];
 
@@ -850,7 +860,9 @@ contract LoyaltyERC1155Escrow is ERC1155Holder, Ownable {
     }
 
     function emergencyFreeze(bool _isFrozen) external {
-        if (msg.sender != TEAM_ADDRESS) revert OnlyTeamCanCall();
+        if (msg.sender != creator) revert OnlyCreatorCanCall();
+        if (escrowState() == EscrowState.Canceled) revert();
+
         allFundsLocked = _isFrozen;
         emit FrozenStateChange(msg.sender, _isFrozen, block.timestamp);
     }
