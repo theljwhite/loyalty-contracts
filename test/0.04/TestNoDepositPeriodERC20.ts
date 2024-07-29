@@ -251,7 +251,7 @@ describe("LoyaltyProgram", async () => {
 
     expect(deposit).to.be.rejectedWith("DepositPeriodNotActive()");
 
-    //try to  withdraw as creator, should revert
+    //try to withdraw as creator, should revert
     const creatorWdAmount = hre.ethers.utils.parseUnits("0.2", "ether");
 
     const creatorWd = escrowOne
